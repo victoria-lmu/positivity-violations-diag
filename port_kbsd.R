@@ -26,8 +26,8 @@ obs1$L <- cut(obs1$L, breaks = seq(-4,4,by = 1)) # finer categorisation
 
 
 # PoRT ---
-setwd("C:/Users/victo/OneDrive/Desktop/Uni/Statistik/BA_thesis")
-source('data/port_utils.R')
+setwd("C:/Users/victo/OneDrive/Desktop/Uni/Statistik/BA_thesis/positivity-violations-diag")
+source("data/port_utils.R")
 lst1 <- list(port = NULL, port_risca = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 gruber <- 5/(sqrt(nrow(obs1))*log(nrow(obs1)))
@@ -55,32 +55,6 @@ lst1
 # with finer categorisation: similar as for binary
 
 # essence: PoRT detected both subgroups that we wanted to be detected, but only when considering beta=0.1
-
-
-# RISCA::port (only works with L as conv.quanti, i.e. not categorised) ---
-# a = 0.05 (default), b = 0.05 (default), g = 1
-RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, data = obs1, gamma = 1)
-# if health status pos, then P(A=1) v low
-# if health status neg, then P(A=1) v high -> P(A=0) v unlikely (as for PoRT)
-
-# a = 0.05 (default), b = gruber ~ 0.023, g = 1
-gruber <- 5/(sqrt(nrow(obs1))*log(nrow(obs1)))
-RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, data = obs1, alpha = 0.05, beta = gruber, gamma = 1)
-# err? first subgroup: 4.4% > b but should be beta < ß
-# err? second subgroup: 4.7% < a but should be alpha >= a
-# err? third: 3.6% > b
-# err? fourth: 3.4% < a and 2.9% > b
-# err? fifth: 2.3% < a
-
-# !!!: do both cond have to be met? both alpha > a & beta < ß ?
-#      but why first subgroup has alpha < a & beta > ß?
-
-# a = 0.01, b = 0.05 (default), g = 1
-RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, data = obs1, alpha = 0.01, beta = 0.05, gamma = 1)
-# covers subgroup form first case, just split into 2 "preciser" groups bc a = 0.01 allows for smaller groups
-# but could've shown same large group as in first case or first case could've shown these 2 already
-
-# essence: RISCA::port detected subgroup that we wanted to be detected, but also returned 2 other subgroups for beta = gruber
 
 
 # KBSD ---
@@ -137,22 +111,22 @@ plot(seq_len(nrow(obs1[subset2,])), obs1[subset2,"L"])
 sem2 <- DAG.empty() +
   node("age", distr = "rnorm", mean = 50, sd = 10) +
   #node("fit", distr = "rbern", prob = 0.1) +
-  node("fit", distr = "rbern", prob = ifelse(age > 75, 0.15, 0.65)) +  # fitness depends on age
+  node("fit", distr = "rbern", prob = ifelse(age > 60, 0.2, 0.65)) +  # fitness depends on age
   # if old & unfit -> def treated, i.e. P(A=0|old & unfit) should be low
-  node("A", distr = "rbern", prob = ifelse((age > 75 & fit == 0), 0.95, 1-0.95))
+  node("A", distr = "rbern", prob = ifelse((age > 60 & fit == 0), 0.95, 1-0.95))
 dag2 <- set.DAG(sem2)
 plotDAG(dag2)
 obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
 
 # check how many observations with age > 75
-obs2[obs2$age > 75,]  # as wanted: only 1 old & unfit that was not treated
-  # expected viol #1: P(A=0|age >75 & fit == 0) = 0 or P(A=1|age >75 & fit == 0) = 1
-nrow(obs2[obs2$age <= 75 & obs2$A == 1,])  # young rarely treated
-  # expected viol #2: P(A=0|age <= 75)~1 or P(A=1|age <= 75)=46/990 = 0.04
+obs2[obs2$age > 60 & obs2$fit == 0,]  # as wanted: old & unfit rarely not treated
+  # expected viol #1: P(A=0|age >60 & fit == 0) = 0, i.e. proba.exposure v high, sample size large enough with 130/1000= 0.13
+nrow(obs2[obs2$age <= 60 & obs2$A == 1,])  # young rarely treated
+  # expected viol #2: P(A=1|age <= 75)~0, sample size large enough with 835/1000
 nrow(obs2[obs2$fit == 1 & obs2$A == 1, ])
-  # expected viol #3: P(A=1|fit == 1) ~0 since only 35/613 = 0.057
-nrow(obs2[obs2$age <= 75 & obs2$fit == 1 & obs2$A == 1,])  # young & fit rarely treated, only 35/612= 0.057
-  # expected viol #4 (intersection of the 2 above)
+  # expected viol #3: P(A=1|fit == 1) ~0 , sample size large enough with 556/1000
+nrow(obs2[obs2$age <= 60 & obs2$fit == 1 & obs2$A == 1,])  # young & fit rarely treated
+  # expected viol #4 (intersection of the 2 above): sample size sufficient with 521/1000
 
 table(cut(obs2$age, breaks = c(0,75,90)), obs2$fit)
 table(cut(obs2$age, breaks = c(0,20,40,75,90)), obs2$fit)
@@ -163,8 +137,8 @@ table(obs2$fit, obs2$A, cut(obs2$age, breaks = c(0,75,90)))
   # only always treated if old & unfit -> should be more treated if young & unfit: include  "| (age <= 75 & fit == 0)" above?
 
 # categorise age
-obs2$age <- cut(obs2$age, breaks = c(0,75,90))
-obs2$age <- cut(obs2$age, breaks = c(0,20,40,75,90))
+obs2$age <- cut(obs2$age, breaks = c(0,60,90))
+obs2$age <- cut(obs2$age, breaks = c(0,20,40,60,90))
 
 
 # PoRT ---
@@ -175,46 +149,29 @@ gruber2 <- 5/(sqrt(nrow(obs2))*log(nrow(obs2)))
 b_values <- c(0.001, 0.01, gruber2, 0.05, 0.1)
 for (a in a_values) {
   for (b in b_values) {
-    # uncategorised age<s
-    lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = "age", cov.quali = "fit",
-                                                               data = obs2, alpha = a, beta = b, gamma = 2) 
+    # uncategorised age
+    #lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = "age", cov.quali = "fit",
+    #                                                           data = obs2, alpha = a, beta = b, gamma = 1) 
     # categorised age
-    #lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"),
-    #                                                           data = obs2, alpha = a, beta = b, gamma = 2)
+    lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"),
+                                                               data = obs2, alpha = a, beta = b, gamma = 2)
     #lst2$port_risca[[paste0("alpha value = ", a)]] <- RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, alpha = a, beta = 0.05, data = obs1, gamma = 1)
   }
 }
 lst2
-# without categorisation: identical for gamma = 1 and gamma = 2 bc only split by age always
-  # only subgroup of age < 75 ever identified as "too rarely treated", never group of age>75 & fit==0
+# without categorisation: identical for gamma = 1 and gamma = 2
+  # always split by 1 var only, as proba.exposure small enough already -> viol 2+3 identified, 4 too small
+  # viol 1 not detected, but should've been for any alpha & beta = 0.05
   # BUT: when are the violating subgroups returned and when "The whole sample presents at least one exposure modality's ..."?
   #      bc maybe the violating subgroup with fit is hidden behind the statement
-# first categorisation: too imprecise, only group splitted by age (never fit) identified & only if beta >= 0.05
-# second categorisation: also only identified if beta >= 0.05
+# first categorisation: too imprecise, only identified if beta >= 0.05
+# second categorisation:
+  # now split by 2 vars (intersection fit=0 & age=(20,40]) for beta = gruber (allows for smaller proba.exposure)
+  # else split by 2 var, viol 2 detected for beta=0.05, viol 2+3 detected for beta=0.1
 
 # essence: all problematic subgroups found, but NB: group of age>75 & fit==0 always treated
 #          but such a small subgroup that never detected by port (even for a=0.01 -> sample prop even smaller with 0.009)
 #          -> would be negligeable for causality estimation as too little impact when so small
-
-
-# RISCA::port ---
-# a = 0.05 (default), b = 0.05 (default), g = 2 (default)
-RISCA::port(group = "A", cov.quanti = c("age", "fit"), cov.quali = NULL, data = obs2,
-            alpha = 0.05, beta = 0.05, gamma = 2)
-  # as above: P(A=1|age < 75) ~ 0 and P(A=1|fit = 1) ~0
-### NB: says "greater than or equal to 0 on variable 'fit'" but actually is only >0 !! ###
-
-# a = 0.05 (default), b = gruber, g = 2 (all default)
-RISCA::port(group = "A", cov.quanti = c("age", "fit"), cov.quali = NULL, data = obs2,
-            alpha = 0.05, beta = gruber2, gamma = 2)
-  # err? first subgroup here should not be included: 4.6% > gruber
-
-# a = 0.01, b = 0.05, g = 2 (default)
-RISCA::port(group = "A", cov.quanti = c("age", "fit"), cov.quali = NULL, data = obs2, alpha = 0.01, beta = 0.05, gamma = 2)
-  # more subgroups bc defined more precisely since lower a permits them to be smaller -> all disjoint
-  # but all 3 could've been returned for a = 0.05 too? subgroup sizes all > 0.05
-
-# essence: all subgroups disjoint & detected that younger ppl/fit ppl rarely treated
 
 
 # KBSD ---
@@ -269,11 +226,11 @@ obs3 <- sim(dag3, rndseed = 12082025, n = 1000)
 # gamma = 1
 table(obs3$L1, obs3$A)/rowSums(table(obs3$L1, obs3$A))
 table(obs3$L2, obs3$A)/rowSums(table(obs3$L2, obs3$A))
-table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> expected viol #1
+table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> expected viol #1 (sample large enough with 386/1000)
 # gamma =2
 table(obs3[obs3$L1 == 0 & obs3$L2 == 0,"A"])
-table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #2
-table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #3
+table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #2 (sample size sufficient with 278/1000)
+table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #3 (sample size sufficient with 346/1000)
 
 table(obs3[obs3$L1 == 0 & obs3$L2 == 1,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L2 == 0,"A"])
@@ -304,9 +261,9 @@ for (a in a_values) {
 }
 lst3
 # gamma = 1:
-  # only for b = 0.1 the one wanted subgroup with L3=0 was detected
+  # only for b = 0.1 the one wanted subgroup with L3=0 was detected; makes sense bc proba.exposure=0.073 which is only <0.1, not <0.05 etc.
 # gamma = 2:
-  # b = gruber/0.05/0.1 best, no matter a -> b = 0.05 even better as gruber/0.1 only find one subgroup each
+  # never v small proba.exposure (< gruber), b = 0.05 best as gruber/0.1 only find one subgroup each
 
 # essence: all violations found! but requires optimising/trying out multiple HP values
 
