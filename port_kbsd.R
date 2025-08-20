@@ -10,7 +10,8 @@ set.seed(15082025)
 # Outcome: Hospitalisation (Y) ~ Ber depending on A and L
 
 # simulate so that neg health score <=> high probs of treatment, pos health score <=> low probs of treatment
-# expected viol: P(A=0|neg health)~0 or P(A=1|neg health)~1, and P(A=0|pos health)~1 or P(A=1|pos health)~0
+# expected viol #1: P(A=0|neg health)~0 or P(A=1|neg health)~1
+# expected viol #2: P(A=0|pos health)~1 or P(A=1|pos health)~0
 
 sem1 <- DAG.empty() +
   node("L", distr = "rnorm", mean = 0, sd = 1) +
@@ -54,7 +55,7 @@ lst1
  # crticial subgroup of healthy and treated only identified for beta = 0.1 (probs not too extreme)
 # with finer categorisation: similar as for binary
 
-# essence: PoRT detected both subgroups that we wanted to be detected, but only when considering beta=0.1
+# essence: PoRT found both subgroups that we wanted to be detected, but needed beta=0.1 to include all
 
 
 # KBSD ---
@@ -161,7 +162,7 @@ for (a in a_values) {
 lst2
 # without categorisation: identical for gamma = 1 and gamma = 2
   # always split by 1 var only, as proba.exposure small enough already -> viol 2+3 identified, 4 too small
-  # viol 1 not detected, but should've been for any alpha & beta = 0.05
+  # viol 1 not detected, but should've been for any alpha & beta = 0.05 bc P(A=1)=0.954 -> P(A=0)=0.046
   # BUT: when are the violating subgroups returned and when "The whole sample presents at least one exposure modality's ..."?
   #      bc maybe the violating subgroup with fit is hidden behind the statement
 # first categorisation: too imprecise, only identified if beta >= 0.05
@@ -169,9 +170,8 @@ lst2
   # now split by 2 vars (intersection fit=0 & age=(20,40]) for beta = gruber (allows for smaller proba.exposure)
   # else split by 2 var, viol 2 detected for beta=0.05, viol 2+3 detected for beta=0.1
 
-# essence: all problematic subgroups found, but NB: group of age>75 & fit==0 always treated
-#          but such a small subgroup that never detected by port (even for a=0.01 -> sample prop even smaller with 0.009)
-#          -> would be negligeable for causality estimation as too little impact when so small
+# essence: all problematic subgroups found except viol 1: group of age>60 & fit==0 always treated
+#          and not even too small subgroup (sample prop is 0.13)
 
 
 # KBSD ---
