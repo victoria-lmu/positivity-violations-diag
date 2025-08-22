@@ -89,14 +89,14 @@ sum(o1$L < 0)  # possible explanation: among treated, more have neg health -> mo
 subset1 <- res1[res1$shift == 1,]
 subset1 <- subset1$diagnostic < 100#20 for outliers
 obs1[subset1,]
-plot(seq_len(nrow(obs1[subset1,])), obs1[subset1,"L"])   # more pos values as expected: healthy ppl in IV=1 have few EDP
+plot(seq_len(nrow(obs1[subset1,])), obs1[subset1,"L"])   # more pos values as expected: healthy ppl in IV=1 have few EDP (confirms viol #2)
 
 # check what strata/confounder values those with low EDP in IV = 2 represent 
 subset2 <- res1[res1$shift == 2,]
 subset2 <- subset2$diagnostic < 100
 obs1[subset2,]
 plot(seq_len(nrow(obs1[subset2,])), obs1[subset2,"L"])
-  # obs with low EDP among A=0 (not treated): neg health (rare that those with bad health not treated)
+  # obs with low EDP among A=0 (not treated): neg health (rare that those with bad health not treated) -> confirms viol #1
 
 # essence: KBSD identified the few healthy&treated (subset1) and nonhealthy&non-treated (subset2) -> matches with port
 
@@ -128,14 +128,6 @@ nrow(obs2[obs2$fit == 1 & obs2$A == 1, ])
   # expected viol #3: P(A=1|fit == 1) ~0 , sample size large enough with 556/1000
 nrow(obs2[obs2$age <= 60 & obs2$fit == 1 & obs2$A == 1,])  # young & fit rarely treated
   # expected viol #4 (intersection of the 2 above): sample size sufficient with 521/1000
-
-table(cut(obs2$age, breaks = c(0,75,90)), obs2$fit)
-table(cut(obs2$age, breaks = c(0,20,40,75,90)), obs2$fit)
-  # most young (age <= 75) are fit, almost all old are unfit
-table(cut(obs2$age, breaks = c(0,20,40,75,90)), obs2$A)
-  # most young (age <= 75) not treated, almost all old treated
-table(obs2$fit, obs2$A, cut(obs2$age, breaks = c(0,75,90)))
-  # only always treated if old & unfit -> should be more treated if young & unfit: include  "| (age <= 75 & fit == 0)" above?
 
 # categorise age
 obs2$age <- cut(obs2$age, breaks = c(0,60,90))
@@ -170,7 +162,7 @@ lst2
   # now split by 2 vars (intersection fit=0 & age=(20,40]) for beta = gruber (allows for smaller proba.exposure)
   # else split by 2 var, viol 2 detected for beta=0.05, viol 2+3 detected for beta=0.1
 
-# essence: all problematic subgroups found except viol 1: group of age>60 & fit==0 always treated
+# essence: all problematic subgroups found except viol #1: group of age>60 & fit==0 always treated
 #          and not even too small subgroup (sample prop is 0.13)
 
 
@@ -184,31 +176,32 @@ o2_1 <- o2
 o2_1$A <- 1
 o2_2 <- o2
 o2_2$A <- 0
-res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), disthalf_vec=c(age=10, fit=0.5, A=0.2), plot.out = F)
+res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), disthalf_vec=c(age=10, fit=0.5, A=0.4), plot.out = F)
 res2_plot <- kbsd(data = o2,
                   int_data_list = list(o2_1, o2_2),
                   disthalf_vec=c(age=10, fit = 0.5, A=0.2))
 res2_plot  # what strata have low EDP? same for outliers among those treated: what covar values do they have?
-table(o2$A)  # already imbalanced here: way more untreated compared to treated! 
+table(o2$A)  # already imbalanced here: way more untreated compared to treated
+table(cut(obs2$age, breaks = c(0,60,90)))  # also more younger ppl
 
 # inspect what strata are those with low EDP in IV rule 1 (A=1)
-subset_3 <- res2[res2$diagnostic < 50 & res2$shift == 1, ]  # all 1,000 obs for A=1 since all have diag < 50
-sum(obs2[subset_3$observation,][, "age"] > 75)
-sum(obs2[subset_3$observation,][, "age"] <= 75) # confirms that subgroup with low support for A=1 has more younger people
+subset_3 <- res2[res2$diagnostic < 50 & res2$shift == 1, ]  # most treated obs have low support (771)
+sum(obs2[subset_3$observation,][, "age"] > 60)
+sum(obs2[subset_3$observation,][, "age"] <= 60) # confirms that subgroup with low support for A=1 has more younger people
 table(obs2[subset_3$observation,][, "fit"])  # confirms that those with low support for A=1 are mostly fit ones
-# more younger ppl makes sense -> treated far less often
-# fit ppl makes sense -> treated less often
+ # more younger ppl makes sense -> treated far less often (confirms viol #2)
+ # fit ppl makes sense -> treated less often (confirms viol #3)
 
 # check what strata are those with low EDP in IV rule 2 (A=0)
-subset4 <- res2[res2$diagnostic < 100 & res2$shift == 2, ]
-table(obs2[subset_4$observation,][, "fit"], cut(obs2[subset_4$observation,][, "age"], breaks = c(0, 75, 90)))
-  # most with low EDP are unfit (first row), the vast majority is young (first col: prob due to class imbalance for age)
-  # biggest intersecting subgroup is unfit & young -> rarely not treated
-# class imbalance: more younger ppl is prob side effect bc so much more young ppl overall
-table(cut(obs2$age, breaks = c(0,75,90)))
-# more unfit ppl makes sense: rare that unfit & not treated <=> low EDP
+subset_4 <- res2[res2$diagnostic < 100 & res2$shift == 2, ]
+table(obs2[subset_4$observation,][, "fit"], cut(obs2[subset_4$observation,][, "age"], breaks = c(0, 60, 90)))
+  # biggest intersecting subgroup is unfit & old -> rarely not treated
+  # among untreated: rare that unfit & old -> most of these would be in treatment group (confirms viol #1)
+# check again how many among unfit & old are treated/untreated
+nrow(obs2[obs2$age > 60 & obs2$fit == 0,])
+table(obs2[obs2$age > 60 & obs2$fit == 0, "A"])  # indeed critical as proba.exposure = 0.95 -> should've been detected by port for beta = 0.1
 
-# essence: KBSD identified 3 of 4 groups that risk to violate pos: young& A=1, fit& A=1, unfit& A=0, young& A=0
+# essence: better than port, KBSD identified all critical groups: young& A=1, fit& A=1, old&unfit & A=0
 
 
 
@@ -229,8 +222,8 @@ table(obs3$L2, obs3$A)/rowSums(table(obs3$L2, obs3$A))
 table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> expected viol #1 (sample large enough with 386/1000)
 # gamma =2
 table(obs3[obs3$L1 == 0 & obs3$L2 == 0,"A"])
-table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #2 (sample size sufficient with 278/1000)
-table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #3 (sample size sufficient with 346/1000)
+table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #2 (sample large enough with 278/1000)
+table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #3 (sample large enough with 346/1000)
 
 table(obs3[obs3$L1 == 0 & obs3$L2 == 1,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L2 == 0,"A"])
@@ -251,7 +244,7 @@ source('data/port_utils.R')
 lst3 <- list(port = NULL, port_risca = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 gruber3 <- 5/(sqrt(nrow(obs2))*log(nrow(obs3)))
-b_values <- c(0.001, 0.01, gruber2, 0.05, 0.1)
+b_values <- c(0.001, 0.01, gruber3, 0.05, 0.1)
 for (a in a_values) {
   for (b in b_values) {
     lst3$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL, cov.quali = c("L1", "L2", "L3"),
@@ -287,23 +280,30 @@ res3_plot
 # according to port, the subgroups with low probs for treatment are: L3=0 & L1=0, L3=0 & L2=0, L3=0
 subset_5 <- res3[res3$diagnostic < 100 & res3$shift == 1,]
 obs3[subset_5$observation, ]
-table(obs3[subset_5$observation, ][, c("L1", "L2")]) 
+table(obs3[subset_5$observation, ][, c("L1", "L2")]) # many L1=0 & L2=0 among treated, but among L1=0 & L2=0 still enough treated&untreated (proba.exposure not extreme)
 table(obs3[subset_5$observation, ][, c("L1", "L3")]) # confirmed that many from L3=0 & L1=0
 table(obs3[subset_5$observation, ][, c("L2", "L3")]) # confirmed that many from L3=0 & L2=0
 table(obs3[subset_5$observation, ][, "L3"])  # many from L3=0
 
+# detected 1 extra group as critical: L1=0 & L2=0 -> but wrongly, bc balanced enough (see row 222)
+
 # what strata are those with low support for untreated (IV = 2)
-subset_6 <- res3[res3$diagnostic < 20 & res3$shift == 2,]
+subset_6 <- res3[res3$diagnostic < 100 & res3$shift == 2,]
 obs3[subset_6$observation, ]
 table(obs3[subset_6$observation, ][, "L1"],
       obs3[subset_6$observation, ][, "L2"],
-      obs3[subset_6$observation, ][, "L3"])  # split by L3: most are L3=0 & L1=1 & L2=0
+      obs3[subset_6$observation, ][, "L3"])  # split by L3: most are L3=0 & L1=1 & L2=0 (for threshold=20, most are L3=1 & L1=0 & L2=1)
+# check among L3=0 & L1=1 & L2=0, how many treated/untreated
+nrow(obs3[obs3$L3==0 & obs3$L1==1 & obs3$L2==0,])
+table(obs3[obs3$L3==0 & obs3$L1==1 & obs3$L2==0, "A"])  # not extreme enough: proba.exposure = 0.17
+# check among L3=1 & L1=0 & L2=1, how many treated/untreated
+nrow(obs3[obs3$L1 == 0 & obs3$L2 == 1 & obs3$L3 == 1,])
+table(obs3[obs3$L1 == 0 & obs3$L2 == 1 & obs3$L3 == 1, "A"])  # not extreme enough: proba.exposure = 0.75
 table(o3$A)  # also: way more untreated compared to treated in general!
-  # for diag < 20: all from group L2==1
 
 # but generally, most EDP between 50 & 300 for both IV rules which is good compared to ex.2 
 
-# essence: KBSD found the strata in which pos is violated (<=> low EDP), even one more among
-#          untreated (A=0 / shift=2) where all have L2=1 
+# essence: KBSD found all 3 strata among A=1 in which pos is violated (<=> low EDP), 
+#          even 2 more strata among A=0 that do not present problem actually
 
 
