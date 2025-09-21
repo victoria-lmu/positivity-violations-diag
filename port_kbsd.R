@@ -232,7 +232,10 @@ res2_plot <- kbsd(data = o2,
                   int_data_list = list(o2_1, o2_2),
                   disthalf_vec=c(age=10, fit = 0.5, A=0.2))
 res2_plot
-table(o2$A)  # already imbalanced here: way more untreated compared to treated
+# IV=1 encompasses all points that originally had A=0 & artificially got A=1 AND those that originally had A=1
+# can tell with table below that prob so few support for IV=1 due to many obs from A=0
+#  for which we intervened on AND THAT CANNOT BE WELL SUPPORTED BY THE FEW OBS ALR IN A=1
+table(o2$A)  # i.e. imbalance does have impact!!!!!!!
 table(cut(obs2$age, breaks = c(0,60,90)))  # also more younger ppl
 
 # inspect what strata are those with low EDP in IV rule 1 (A=1)
@@ -247,12 +250,20 @@ obs2[subset_3$observation,] %>% filter(age<=60 & fit == 1) %>% nrow()  # most ar
 # inspect what strata are those with low EDP in IV rule 2 (A=0)
 subset_4 <- res2[res2$diagnostic < 100 & res2$shift == 2, ]
 table(obs2[subset_4$observation,][, "fit"], cut(obs2[subset_4$observation,][, "age"], breaks = c(0, 60, 90)))
-  # biggest intersecting subgroup is unfit & old -> rarely not treated (confirms viol #1) -> they are most of those with low EDP
+  # biggest intersecting subgroup is unfit & old -> rarely not treated (confirms viol #1)
 # check again how many among unfit & old are treated/untreated
 table(obs2[obs2$age > 60 & obs2$fit == 0, "A"])/nrow(obs2[obs2$age > 60 & obs2$fit == 0,])
   # indeed critical as proba.exposure = 0.95 (most are treated) -> should've been detected by port for beta = 0.05/0.1
 
 # essence: better than port, KBSD identified all critical groups (viol 1,2,3)
+
+# compare prop of obs where freq for each treatment level < 0.1:
+table(obs2 %>% filter(fit == 1 & age == "(0,60]") %>% select(A))  # pos viol for 0.1
+table(obs2 %>% filter(fit == 1 & age == "(60,90]") %>% select(A)) # viol for 0.05
+table(obs2 %>% filter(fit == 0 & age == "(0,60]") %>% select(A)) # viol for 0.05
+table(obs2 %>% filter(fit == 0 & age == "(60,90]") %>% select(A)) # viol for 0.05
+# how to use this as metric, kbsd uses same data so will be same & after constructing
+#    hypothetical scenario in kbsd, does not realy make sense
 
 
 
@@ -471,18 +482,18 @@ for (i in 6:10) {
 # Add treatment A depending on a nonlinear function of L’s
 # --> ensures some confounder combinations lead to low/high treatment probs
 DAG <- DAG + node("A", distr = "rbern",
-                  prob = plogis(0.5*L6 + L7 - L8 + 0.9*L9 + 2*L10))
+                  prob = plogis(0.5*L6 + L7 - L8 + 0.9*L9 + L10))
 DAG <- set.DAG(DAG)
 
 dat <- sim(DAG, n = 1000)
 
 binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
 print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
-# now more diverse: most have L10=1, L9 = 0, L7 = 1
+# now more diverse: most have L10=1, L8 = 0, L7 = 1
 
 port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
      cov.quanti = NULL, data = dat, alpha = 0.05, beta = 0.1, gamma = 3)  # beta = 0.1 here
-# more or less detected -> need to take closer look and compare
+# seems like detected -> need to take closer look and compare
 make_strata_table(dat, A = "A", binary_vars = binary_vars) %>%
   filter((L7==1 & L8==0 & L6==1) |
          (L7==1 & L6==1 & L9==1) |
@@ -490,7 +501,51 @@ make_strata_table(dat, A = "A", binary_vars = binary_vars) %>%
   filter(proba_exp <= 0.1 | proba_exp >= 0.9)  # indeed all critical treatment probs; most covered by L10==1
 
 
+sem5 <- DAG.empty() +
+  node("L1", distr = "rbern", prob = 0.3) +
+  node("L2", distr = "rbern", prob = 0.1) + 
+  node("L3", distr = "rbern", prob = 0.6) +
+  node("L4", distr = "rbern", prob = 0.4) +
+  node("L5", distr = "rbern", prob = 0.5) +
+  node("A", distr = "rbern", prob = 0.1*L1 + 0.1*L2 + 0.1*L3 + 0.1*L4 + 0.6*L5)  # if L1, L2, L3=1 -> prob A=1
+dag5 <- set.DAG(sem5)
+plotDAG(dag5)
+obs5 <- sim(dag5, rndseed = 12082025, n = 1000)
+port("A", cov.quali = c("L1", "L2", "L3", "L4", "L5"), cov.quanti = NULL,
+                        data = obs5, alpha = 0.05, beta = 0.1, gamma = 5)
 
-# 5) 50 Confounders ----
+
+# 5) 20 Confounders ----
+DAG2 <- DAG.empty()
+# L1-L10 (mix of continuous & binary for realism)
+for (i in 1:10) {
+  DAG2 <- DAG2 + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
+}
+for (i in 11:20) {
+  DAG2 <- DAG2 + node(paste0("L", i), distr = "rbern", prob = 0.5)
+}
+DAG2 <- set.DAG(DAG2)
+dat2 <- sim(DAG2, rndseed = 12082025, n = 1000)[-1]
+port("A", cov.quanti = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+     cov.quali = c("L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),  # why is this a problem??
+     data = dat2, alpha = 0.05, beta = 0.1, gamma = 100)
 
 
+# 6) 50 Confounders ----
+DAG2 <- DAG.empty()
+# L1-L10 (mix of continuous & binary for realism)
+for (i in 1:25) {
+  DAG2 <- DAG2 + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
+}
+for (i in 26:50) {
+  DAG2 <- DAG2 + node(paste0("L", i), distr = "rbern", prob = 0.5)
+}
+DAG2 <- set.DAG(DAG2)
+dat2 <- sim(DAG2, rndseed = 12082025, n = 1000)[-1]
+port("A", cov.quanti = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
+                         "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20",
+                         "L21", "L22", "L23", "L24" ,"L25"),
+     cov.quali = c("L26", "L27", "L28", "L29", "L30", "L31", "L32", "L33", "L34", "L35", "L36",
+                   "L37", "L38", "L39", "L40", "L41", "L42", "L43", "L44", "L45", "L46", "L47",
+                   "L48", "L49", "L50"),  # why is this a problem??
+     data = dat2, alpha = 0.05, beta = 0.1, gamma = 100)

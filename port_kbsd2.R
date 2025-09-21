@@ -39,10 +39,16 @@ res1_plot <- kbsd(data = o1,
                   int_data_list = list(o1_1, o1_2),
                   disthalf_vec=c(L=4.9, A=0.5*0.5))
 res1_plot
-# for IV=1 (which equals A=1) overall lower EDP, but should have higher as points are closer together?
-# IV = 2 (A=0) should have lower EDP as points are more scattered -> more "singles" without support
+# for IV=1 (which equals forcing A=1 for all obs from A=0 AND all obs with initial A=1) overall lower EDP:
+#  makes sense bc more scattered than A=1 -> those from A=0 being assigned A=1 don't have many obs nearby
+#  -> esp all between [0,10], [30,35] will have low support
+# IV = 2 (A=0) shows what happens when assigning A=0 for all obs from A=1 AND also considering all obs alr in A=0:
+# -> makes sense that higher EDP overall, bc esp for those forced from A=1,
+#   more likely to be surrounded by other obs from A=0
+# -> yet, esp for [20,30] support will be lowest (see subset plots below)
+# but overall comparable EDP distribution as extent of scattering similar
 
-# check what L values the low-support points in A=0 have
+# check what L values the points with lowest EDP in IV=1 <=> forced A=1 have
 shift1 <- res1[res1$shift == 1,]
 outliers1 <- shift1$diagnostic < 50 # for outliers
 l_values1 <- obs1[outliers1, "L"]  # the obs (with L, A values) which have low EDP (among A=0)
@@ -56,14 +62,15 @@ plot(l_values1, diag_values1$diagnostic)
 # wenn wir für jede unserer obs auf beide IV levels intervenieren (Konstruktion der cf), d.h. jede obs
 # bekommt einmal A=0 und A=1, dann hätten die Punkte mit L nahe 0, nahe 30 mit A=1 sehr niedrige EDP
 
-# check what L values the low-support points in A=0 have
+# check what L values the low-support points in IV=2 <=> A=0 have
 shift2 <- res1[res1$shift == 2,]
 outliers2 <- shift2$diagnostic < 50 # for outliers
 l_values2 <- obs1[outliers2, "L"]  # to which original obs (&L values) do these outliers belong?
 diag_values2 <- shift2[outliers2,] # what diag values to these outliers have
 plot(l_values2, diag_values2$diagnostic)
 # 1. again outliers are obs with L < 10 | L > 30
-# 2. points in [20,30] detected as with low support
+# 2. points in [20,30] detected as with low support: bc if take points from A=1 and assign
+#    to them A=0, then those with L in [15,30] will have low support/few points around
 
 # effectively vergleicht kbsd die Verteilung von L innerhalb A=0 und A=1 -> wenn ähnlich, dann sollten für beide IV levels gleiche EDP
 # wenn nicht ähnlich, zeigt es welche L-Werte im jeweiligen A "fehlen" (dort wo niedrige EDP)
