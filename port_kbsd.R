@@ -2,6 +2,8 @@
 # Simulating causal settings with 1,2 and 3 confounders with sparse data for some strata
 # and checking if different diagnostics detect these strata with positivity violations.
 library(simcausal)
+library(tidyverse)
+theme_set(theme_minimal())
 set.seed(15082025)
 
 ## 1) One Confounder ----
@@ -43,7 +45,6 @@ for (a in a_values) {
     # with categorisation: L as cov.quali
     lst1$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quali = "L", cov.quanti = NULL,
                                                                data = obs1, alpha = a, beta = b, gamma = 1) 
-    #lst1$port_risca[[paste0("alpha value = ", a)]] <- RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, alpha = a, beta = 0.05, data = obs1, gamma = 1)
   }
 }
 lst1
@@ -88,33 +89,80 @@ res1_plot
 #              -> pos concern: problematic to assess what would happen if they were treated
 
 
-# check what strata/confounder values those with low EDP in IV = 1 represent (prob those with pos health score)
+# check what strata/conf values those with low EDP in IV = 1 represent (prob those with pos health score)
 shift1 <- res1[res1$shift == 1,]
-outliers1 <- shift1$diagnostic < 100
+outliers1 <- shift1$diagnostic < quantile(res1[res1$shift==1, "diagnostic"], probs = 0.05)  # outliers (below whiskers' ends)
 l_values1 <- obs1[outliers1, "L"]  # to which original obs (&L values) do these outliers belong?
 diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
-plot(l_values1)
 plot(l_values1, diag_values1$diagnostic)
- # more pos values as expected: healthy ppl in IV=1 have few EDP (confirms viol #2)
- # "structural" pos viol: no reason to treat them
+# support visibly decreases for more extreme L -> L~0 have a lot of support so not included in the plot
+# also mostly positive L values as expected -> means few healthy ppl received IV=1 (confirms viol #2)
 
-# check what strata/confounder values those with low EDP in IV = 2 (A=0) represent
+# check what strata/confounder values those with low EDP in IV = 2 (everyone received A=0) represent
 shift2 <- res1[res1$shift == 2,]
-outliers2 <- shift2$diagnostic < 100
+outliers2 <- shift2$diagnostic < quantile(res1[res1$shift==2, "diagnostic"], probs = 0.05)
 l_values2 <- obs1[outliers2, "L"]  # to which original obs (&L values) do these outliers belong?
 diag_values2 <- shift2[outliers2,] # what diag values do these outliers have
-plot(l_values2)
-plot(l_values2, diag_values2$diagnostic)  # the smaller, the less support
- # obs with low EDP among A=0 (not treated) are mostly of neg health (rare that those with bad health not treated) -> confirms viol #1
- # also "structural" pos viol: no reason not to treat them
+plot(l_values2, diag_values2$diagnostic)
+# the smaller L, the less support -> obs with negative L are rare in A=0 (rare that those with bad health not treated) -> confirms viol #1
 
 # essence: KBSD identified both critical strata
 # but ex. IV = 2: when checking for EDP threshold =100, not all neg are identified
-# i.e. number of identified critical obs depends on EDP threshold chosen: if higher, 
-# then broader group (not only neg around -1 but until -0.5)/more "critical obs" are identified
-# so similar function of EDP threshold and b??
-# i.e. the higher the EDP threshold, the more matches with port results
+# i.e. the higher the EDP threshold, the more matches with port results, the more is "covered"
+# but kbsd, esp plotting L values against diag values v useful for first identification of critical strata!
 
+
+# best case disthalf vec: doubled
+res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), disthalf_vec=c(L=2*1, A=2*0.5*0.5),
+             plot.out = F)
+res1_plot <- kbsd(data = o1,
+                  int_data_list = list(o1_1, o1_2),
+                  disthalf_vec= c(L=2*1, A=2*0.5*0.5))
+res1_plot
+
+# worst case disthalf vec: halved
+res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), disthalf_vec=c(L=0.5*1, A=0.5*0.5*0.5),
+             plot.out = F)
+res1_plot <- kbsd(data = o1,
+                  int_data_list = list(o1_1, o1_2),
+                  disthalf_vec= c(L=0.5*1, A=0.5*0.5*0.5))
+res1_plot
+
+# essence: always same trend across IV levels (generally better support for IV=1)
+# plots for strata also yield same results for underlying L values
+
+
+### alternative metrics for disthalf vec ----
+# 1) MAD within L, A instead of SD
+res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), disthalf_vec=c(L=mad(o1$L), A=0.5*mad(o1$A)), # HALF of SD for A
+             plot.out = F)
+res1_plot <- kbsd(data = o1,
+                  int_data_list = list(o1_1, o1_2),
+                  disthalf_vec=c(L=mad(o1$L), A=0.5*mad(o1$A)))
+res1_plot
+# unsuitable: assume that the error is due to mad(A) = 0 ?
+
+# 2) IQR for L, A instead of SD
+res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), disthalf_vec=c(L=IQR(o1$L), A=0.5*IQR(o1$A)), # HALF of SD for A
+             plot.out = F)
+res1_plot <- kbsd(data = o1,
+                  int_data_list = list(o1_1, o1_2),
+                  disthalf_vec=c(L=IQR(o1$L), A=0.5*IQR(o1$A)))
+res1_plot
+
+# 3) average pairwise distance within L, A
+res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2),
+             disthalf_vec=c(L=mean(dist(matrix(o1$L), method = "euclidean")),
+                            A=0.5*mean(dist(matrix(o1$A), method = "euclidean"))),
+             plot.out = F)
+res1_plot <- kbsd(data = o1,
+                  int_data_list = list(o1_1, o1_2),
+                  disthalf_vec=c(L=mean(dist(matrix(o1$L), method = "euclidean")),
+                                 A=0.5*mean(dist(matrix(o1$A), method = "euclidean"))))
+res1_plot
+
+# essence: all have same trend, but good for robustness as less sensitive to outliers compared to SD
+# plots for strata also yield same results for underlying L values
 
 
 
@@ -265,6 +313,9 @@ table(obs2 %>% filter(fit == 0 & age == "(60,90]") %>% select(A)) # viol for 0.0
 # how to use this as metric, kbsd uses same data so will be same & after constructing
 #    hypothetical scenario in kbsd, does not realy make sense
 
+### alternative metrics for disthalf_vec ----
+
+
 
 
 ## 3) Three Confounders ----
@@ -309,7 +360,7 @@ gruber3 <- 5/(sqrt(nrow(obs3))*log(nrow(obs3)))
 b_values <- c(0.001, 0.01, gruber3, 0.05, 0.1)
 for (a in a_values) {
   for (b in b_values) {
-    lst3$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL, cov.quali = c("L1", "L2", "L3"),
+    lst3$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL, cov.quali = c("L3", "L2", "L1"),
                                                                data = obs3, alpha = a, beta = b, gamma = 3) 
     #lst3$port_risca[[paste0("alpha value = ", a)]] <- RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, alpha = a, beta = 0.05, data = obs1, gamma = 1)
   }
@@ -377,9 +428,12 @@ table(o3$A)  # also: way more untreated compared to treated in general!
 #          also found the additional stratum that PoRT had detected (L3=0 & L1=0 & L2=0),
 #          even flagged 2 more strata among A=0 that do not present problem actually
 
+### alternative metrics for disthalf_vec ----
 
 
-# 4) 10 Confounders ----
+
+
+# 4.1) 10 Confounders ----
 sem4 <- DAG.empty() +
   node("L1", distr = "rbern", prob = 0.5) +
   node("L2", distr = "rbern", prob = 0.5) +
@@ -396,103 +450,181 @@ sem4 <- DAG.empty() +
   node("A", dist = "rbern", prob = plogis(L1 + 2*L2 + 3*L3 + 0.4*L4 + 0.5*L5*L6))
 dag4 <- set.DAG(sem4)
 obs4 <- sim(dag4, rndseed = 16092025, n = 1000)
-plot(obs4[-1])
+boxplot(obs4[-1])
+table(obs4$A)  # v imbalanced alr
 
-# better simulation?
-DAG <- DAG.empty()
-# L1-L10 (mix of continuous & binary for realism)
-for (i in 1:5) {
-  DAG <- DAG + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
-}
-for (i in 6:10) {
-  DAG <- DAG + node(paste0("L", i), distr = "rbern", prob = 0.5)
-}
-# Add treatment A depending on a nonlinear function of L’s
-# --> ensures some confounder combinations lead to low/high treatment probs
+
+# 4.2) 10 Confounders ----
+set.seed(22092025)
+# L1-L10 (mix of cont & binary)
+DAG <- DAG.empty() +
+  node("L1", distr = "rnorm", mean = 1, sd = 1) +
+  node("L2", distr = "rnorm", mean = 2, sd = 1) +
+  node("L3", distr = "rnorm", mean = 3, sd = 1) +
+  node("L4", distr = "rnorm", mean = 4, sd = 1) +
+  node("L5", distr = "rnorm", mean = 5, sd = 1) +
+  node("L6", distr = "rbern", prob = 0.5) +
+  node("L7", distr = "rbern", prob = 0.5) +
+  node("L8", distr = "rbern", prob = 0.5) +
+  node("L9", distr = "rbern", prob = 0.5) +
+  node("L10", distr = "rbern", prob = 0.5)
+  
+#  do not use for loop anymore: returned weird obs -> rnorm obs were all similar 
+# for (i in 1:5) {
+#   DAG <- DAG + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
+# }
+# for (i in 6:10) {
+#   DAG <- DAG + node(paste0("L", i), distr = "rbern", prob = 0.5)
+# }
+
+# A dep on a nonlinear function of bernoulli L -> ensures some conf combos lead to low/high treatment probs
 DAG <- DAG + node("A", distr = "rbern",
-                  prob = plogis(-1 + 4*L8 + 0.6*L9 + 0.3*L10 - 0.5*L6 + 0.8*L7))
+                  prob = plogis(2*L6*L7*L8))  # A only depends on these conf; should help characterising problematic strata
 DAG <- set.DAG(DAG)
-
 dat <- sim(DAG, n = 1000)
-head(dat)
-
-
-# PoRT ---
-source('data/port_utils.R')
-port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
-     cov.quanti = c("L1", "L2", "L3", "L4", "L5"), data = dat, alpha = 0.05, beta = 0.05, gamma = 3)
-
-# check if in data, also only these 10 strata with the specified extreme tment probs: imposs to do for all conf?!
-# -> can only verify treatment freq in critical subgroups
-table(dat[dat$L7==1 & dat$L2<8.888 & dat$L1 >=9.314, "A"])  # indeed almost all of them received treatment
-# -> or via prop scores: if have v low or v high <-> extreme treatment probs
-ps_mod <- glm(A ~ L1+L2+L3+L4+L5+L6+L7+L8+L9+L10, family = binomial(), data = dat)
-dat$ps <- predict(ps_mod, type = "response")
-summary(dat$ps)
-table(cut(dat$ps, breaks = seq(0,1,by=0.05), include.lowest=TRUE), dat$A)
-library(ggplot2)
-theme_set(theme_minimal())
-ggplot(dat, aes(x = ps, fill = factor(A))) +
-  geom_density(alpha=0.4)  # quite a few extreme treatment probs, esp for P(A=1)
-
 
 # table to check for extreme treatment probs only for binary conf: results in table of dimension 2^5
-## check how many would be critical (e.g. proba_exp > 0.05)
-make_strata_table <- \(dat, A = "A", binary_vars){
+make_strata_table <- function(dat, A = "A", binary_vars){
   dat %>%
     group_by(across(all_of(binary_vars))) %>%
     summarise(
       n      = n(),
-      n_treat= sum(.data[[A]] == 1),
-      n_ctrl = sum(.data[[A]] == 0),
-      proba_exp= mean(.data[[A]] == 1),
-      .groups = "drop") %>%
+      n_treat = sum(.data[[A]] == 1),
+      n_control = sum(.data[[A]] == 0),
+      proba_exp= mean(.data[[A]] == 1), .groups = "drop") %>%
     arrange(proba_exp)
 }
-binary_vars <- paste0("L", 6:10) # in our case, L6...L10 are binary
+binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
 print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
-# almost all have L8==1
+# as wanted: all violating subgroups have L8=1 & L6=1 & L7=1 (NB: overall only have extremely HIGH proba_exp, not extr LOW)
+# sample size of L8=1 & L6=1 & L7=1: 0.13, proba_exp = 106/117 = 0.906 i.e. to detect with any alpha & beta = 0.1
 
-## check if these are also reported as critical in port
+### continuous vars uncategorised ----
 lst5 <- list(port = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 b_values <- c(0.001, 0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
 for (a in a_values) {
   for (b in b_values) {
-    lst5$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL,
+    lst5$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = c("L1", "L2", "L3", "L4", "L5"),
                                                                cov.quali = c("L6", "L7", "L8", "L9", "L10"),
-                                                               data = dat, alpha = a, beta = b, gamma = 3) 
+                                                               data = dat, alpha = a, beta = b, gamma = 10) 
   }
 }
 lst5
-# indeed, almost all involve L8 == 1
-port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"), cov.quanti = NULL,
-     data = dat, alpha = 0.01, beta = 0.03, gamma = 3)  # beta = 0.03 here
+# gamma = 1,2: predefined critical stratum not yet poss to cover bc intersection of 3
+#  -> so other viol among cont conf, but only for alpha=0.01/0.02
+#     (where small groups poss -> reason: greedy categorisation esp for small alphas)
+#  -> the smaller you alow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
+# gamma = 3-10: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
+#  -> included! BUT never for a=0.02/0.03/0.04 & beta=0.1!
 
 
-###### one more situation where not so extreme with just one L8 being the "problem" ##
-DAG <- DAG.empty()
-# L1-L10 (mix of continuous & binary for realism)
-for (i in 1:5) {
-  DAG <- DAG + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
+port("A", cov.quali = c("L10", "L9", "L8", "L7", "L6"),
+     cov.quanti = c("L3", "L2"), data = dat, alpha = 0.05, beta = 0.1, gamma = 3)
+# important finding: order of specifying CONTINUOUS covars as argument matters -> returns diff subgroups!
+# e.g. gamma = 3:
+#   diff subgroups for c("L1", "L2", "L3", "L4", "L5"), c("L3", "L1", "L2", "L4", "L5"), c("L2", "L3", "L1", "L4", "L5")
+#   same for L2, L3 (L8=1 & L6=1 & L7=1 is undetected) and L3, L2 (detected)
+# e.g. gamma = 4:
+#   undetected if order in continuous vars is L2, L1 -> detected if order is L1, L2
+#   same for L2, L3 (undetected) and L3, L2 (detected)
+# how is this possible?
+
+### continuous vars categorised ----
+# check if problem of specifying order of cov.quanti persists with categorisation
+dat_cat <- dat
+for (i in names(dat_cat)[-1]) {
+  if (typeof(dat_cat[[i]]) == "double") {
+    dat_cat[[i]] <- cut(dat_cat[[i]], breaks = c(-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8))
+  }
 }
-for (i in 6:10) {
-  DAG <- DAG + node(paste0("L", i), distr = "rbern", prob = 0.5)
+lst5_cat <- list(port=NULL)
+for (a in a_values) {
+  for (b in b_values) {
+    lst5_cat$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL,
+                                                               cov.quali = c("L1", "L7", "L8", "L9", "L2", "L3", "L4", "L5",
+                                                                             "L6", "L10"),
+                                                               data = dat_cat, alpha = a, beta = b, gamma = 3) 
+  }
 }
-# Add treatment A depending on a nonlinear function of L’s
-# --> ensures some confounder combinations lead to low/high treatment probs
-DAG <- DAG + node("A", distr = "rbern",
-                  prob = plogis(0.5*L6 + L7 - L8 + 0.9*L9 + L10))
-DAG <- set.DAG(DAG)
+lst5_cat
+# gamma = 1: no critical subgroup
+# gamma = 2: one critical subgroup for alpha = 0.01, but v small
+# gamma = 3-8: now detected for all alpha, beta = 0.1 as wanted! shows importance of categorising cont conf!! also computationally faster
+# gamma = 9,10  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# problem of changing order in cov.quanti irrelevant here bc now all vars in cov.quali due to categorisation
 
-dat <- sim(DAG, n = 1000)
+# KBSD ---
+source("kbsd.R")
+o5 <- dat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 A=0.5*sd(o5$A)))
+res5_plot
+# overall v few EDP as high-dim adjustment set
 
-binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
-print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
-# now more diverse: most have L10=1, L8 = 0, L7 = 1
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+o5[subset_5_1$observation, ]
+# did not built in viol here on purpose so would have to search in detail which underlying covar values
 
-port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
-     cov.quanti = NULL, data = dat, alpha = 0.05, beta = 0.1, gamma = 3)  # beta = 0.1 here
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+o5[subset_5_2$observation, ]
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among untreated is L8=1 & L6=1 & L7=1 -> as expected
+
+
+# disthalf_vec: best case values, i.e. double values <=> kernel less steep
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=2*sd(o5$L1), L2 = 2*sd(o5$L2), L3 = 2*sd(o5$L3), L4 = 2*sd(o5$L4), L5 = 2*sd(o5$L5),
+                            L6 = 2*sd(o5$L6), L7 = 2*sd(o5$L7), L8 = 2*sd(o5$L8), L9 = 2*sd(o5$L9), L10 = 2*sd(o5$L10),
+                            A=2*0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=2*sd(o5$L1), L2 = 2*sd(o5$L2), L3 = 2*sd(o5$L3), L4 = 2*sd(o5$L4), L5 = 2*sd(o5$L5),
+                                 L6 = 2*sd(o5$L6), L7 = 2*sd(o5$L7), L8 = 2*sd(o5$L8), L9 = 2*sd(o5$L9), L10 = 2*sd(o5$L10),
+                                 A=2*0.5*sd(o5$A)))
+res5_plot
+# table for tracing back critical strata (IV=0) more balanced now -> L8=1 & L6=1 & L7=1 not particularly problematic
+
+# " " : worst case values, i.e. halve values <=> kernel steeper
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=0.5*sd(o5$L1), L2 = 0.5*sd(o5$L2), L3 = 0.5*sd(o5$L3), L4 = 0.5*sd(o5$L4), L5 = 0.5*sd(o5$L5),
+                            L6 = 0.5*sd(o5$L6), L7 = 0.5*sd(o5$L7), L8 = 0.5*sd(o5$L8), L9 = 0.5*sd(o5$L9), L10 = 0.5*sd(o5$L10),
+                            A=0.5*0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=0.5*sd(o5$L1), L2 = 0.5*sd(o5$L2), L3 = 0.5*sd(o5$L3), L4 = 0.5*sd(o5$L4), L5 = 0.5*sd(o5$L5),
+                                 L6 = 0.5*sd(o5$L6), L7 = 0.5*sd(o5$L7), L8 = 0.5*sd(o5$L8), L9 = 0.5*sd(o5$L9), L10 = 0.5*sd(o5$L10),
+                                 A=0.5*0.5*sd(o5$A)))
+res5_plot
+# table for tracing back critical strata (IV=0) most imbalanced now -> prominence of L8=1 & L6=1 & L7=1 v striking
+
+# over all disthalf_vec specifications: same general trend with better support for IV=1, but EDP values quite diff
+
+### alternative metrics for disthalf vec ----
+
+
+
+
+# no pattern: as soon as >2, stratum is not detected, but it is again for c("L1", "L3", "L2", "L4")
+
 # seems like detected -> need to take closer look and compare
 make_strata_table(dat, A = "A", binary_vars = binary_vars) %>%
   filter((L7==1 & L8==0 & L6==1) |
