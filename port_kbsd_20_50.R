@@ -1,5 +1,4 @@
-library(simcausal)
-library(tidyverse)
+source("setup.R")
 
 # 5) 20 Confounders ----
 set.seed(23092025)
@@ -60,7 +59,7 @@ port("A", cov.quanti = NULL,
 # gamma = 3: same as gamma=2 
 
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
-b_values <- c(0.001, 0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
 lst6_cat <- list()
 for (a in a_values) {
   for (b in b_values) {

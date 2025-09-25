@@ -1,5 +1,4 @@
-library(simcausal)
-library(tidyverse)
+source("setup.R")
 
 # 4) 10 Confounders ----
 
@@ -52,31 +51,28 @@ print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
 source("data/port_utils.R")
 lst5 <- list()
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
-b_values <- c(0.001, 0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
 g_values <- 1:10
-for (a in a_values) {
-  for (b in b_values) {
-    for (g in g_values) {
-      lst5[[paste0("gamma" = g, "\n", "alpha = ", a, ", beta = ", b)]] <-
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
         port(A = "A", cov.quanti = c("L1", "L2", "L3", "L4", "L5"),
              cov.quali = c("L6", "L7", "L8", "L9", "L10"), data = dat, alpha = a, beta = b, gamma = g)
     }
   }
 }
 lst5
-sink(file = "port_10_uncat.txt")
-print(lst5)
-sink()
 # gamma = 1,2: predefined critical stratum not yet poss to cover bc intersection of 3
 #  -> so other viol among cont conf, but only for alpha=0.01/0.02
 #     (where small groups poss -> reason: greedy categorisation esp for small alphas)
 #  -> the smaller you alow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
 # gamma = 3-10: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
-#  -> included! BUT never for a=0.02/0.03/0.04 (& beta=0.1)!, only for a=0.01/0.05/0.1
+#  -> included for a=0.01/0.05/0.1 (& beta=0.1), BUT never for a=0.02/0.03/0.04 (& beta=0.1)
 
 
 port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
-     cov.quanti = c("L3", "L2"), data = dat, alpha = 0.01, beta = 0.1, gamma = 4)
+     cov.quanti = c( "L2", "L1", "L3", "L4"), data = dat, alpha = 0.01, beta = 0.1, gamma = 4)
 # important finding: order of specifying CONTINUOUS covars as argument matters -> returns diff subgroups!  ~~~~~~~~~~ seems to work after all ??~~~~~~~~~~~
 # e.g. gamma = 3:
 #   diff subgroups for c("L1", "L2", "L3", "L4", "L5"), c("L3", "L1", "L2", "L4", "L5"), c("L2", "L3", "L1", "L4", "L5")
@@ -86,6 +82,7 @@ port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
 #   same for L2, L3 (undetected) and L3, L2 (detected)
 # how is this possible?
 
+
 ## PoRT: continuous vars categorised ----
 # check if problem of specifying order of cov.quanti persists with categorisation
 dat_cat <- dat
@@ -94,20 +91,24 @@ for (i in names(dat_cat)[-1]) {
     dat_cat[[i]] <- cut(dat_cat[[i]], breaks = c(-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8))
   }
 }
-lst5_cat <- list(port=NULL)
-for (a in a_values) {
-  for (b in b_values) {
-    lst5_cat$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL,
-                                                                   cov.quali = c("L1", "L7", "L8", "L9", "L2", "L3", "L4", "L5",
-                                                                                 "L6", "L10"),
-                                                                   data = dat_cat, alpha = a, beta = b, gamma = 10) 
+lst5_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5_cat[[paste0("gamma = ", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL, cov.quali = c("L1", "L2", "L3", "L4", "L5", 
+                                                       "L6", "L7", "L8", "L9", "L10"),
+             data = dat_cat, alpha = a, beta = b, gamma = g) 
+    }
   }
 }
 lst5_cat
 # gamma = 1: no critical subgroup
 # gamma = 2: one critical subgroup for alpha = 0.01, but v small
-# gamma = 3-8: now detected for all alpha, beta = 0.1 as wanted! shows importance of categorising cont conf!! also computationally faster
-# gamma = 9, 10: for all alpha & beta = 0.1, except for alpha = 0.01 & beta = 0.1
+# gamma = 3-10: detected for all alpha & beta = 0.1, except alpha = 0.01 & alpha = 0.02 now too!?!
+# -> shows importance of categorising cont conf!! also computationally faster
+# -> weird that not for alpha = 0.01 as in uncategorised case.. so in case of categorisation,
+#     if a=0.01 (too small alpha) lets focus on small strata only?? but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation
 # problem of changing order in cov.quanti irrelevant here bc now all vars in cov.quali due to categorisation
 
 

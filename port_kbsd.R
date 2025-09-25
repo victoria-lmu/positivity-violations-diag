@@ -1,9 +1,7 @@
 
 # Simulating causal settings with 1,2 and 3 confounders with sparse data for some strata
 # and checking if different diagnostics detect these strata with positivity violations.
-library(simcausal)
-library(tidyverse)
-theme_set(theme_minimal())
+source("setup.R")
 set.seed(15082025)
 
 ## 1) One Confounder ----
@@ -12,8 +10,8 @@ set.seed(15082025)
 # Outcome: Hospitalisation (Y) ~ Ber depending on A and L
 
 # simulate so that neg health score <=> high probs of treatment, pos health score <=> low probs of treatment
-# expected viol #1: P(A=1|neg health)~1
-# expected viol #2: P(A=1|pos health)~0
+# expected viol #1: P(A=1|neg health)~1 -> among all with neg L, i.e. if seen as one category as lateron: P(A=1) = 0.97, subgroup size = 51.9% -> from beta = gruber
+# expected viol #2: P(A=1|pos health)~0 -> among all with pos L i seen as one cat: P(A=0) = 0.93, subgroup size = 48.1 % -> to be detected for beta = 0.1
 
 sem1 <- DAG.empty() +
   node("L", distr = "rnorm", mean = 0, sd = 1) +
@@ -36,7 +34,7 @@ source("data/port_utils.R")
 lst1 <- list(port = NULL, port_risca = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 gruber <- 5/(sqrt(nrow(obs1))*log(nrow(obs1)))
-b_values <- c(0.001, 0.01, gruber, 0.05, 0.1)  # add 0.02, remove 0.011!?! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+b_values <- c(0.01, gruber, 0.05, 0.1)
 for (a in a_values) {
   for (b in b_values) {
     # without categorisation: L as cov.quanti
@@ -49,13 +47,11 @@ for (a in a_values) {
 }
 lst1
 # without categorisation:
- # subgroup of healthy only from beta = 0.05, as P(A=1|L>0)=0.04 not that extreme
- # except for v small alpha, but too small as subgroups too precise, e.g. alpha = 0.01/0.02
+ # both always covered, though for small alpha by dividing into small groups, for big alpha in broader groups
  # BEST COMBO: a=0.05, b=0.05 or a=0.05, b=0.1 (= a=0.1,b=0.1) to be stricter with probs for pos viol
  # a = 0.1, b = 0.05 already misses 0 < L < 1, because P(A|0<L<1) = 0.07 -> only detected with b=0.1
 # with binary categorisation into neg & pos health:
- # both viol only identified for beta = 0.1 as for healthy, P(A=1|L>0)=0.04 not that extreme
- # but also viol #1 only from beta >= gruber bc exposure not too extreme
+ # both detected from b=0.1 as they should
  # BEST COMBO: a = 0.05, b = 0.1
 # with finer categorisation:
  # similar as for binary, although pos group partly from beta=0.05 already thanks to finer categories
@@ -107,6 +103,8 @@ plot(l_values2, diag_values2$diagnostic)
 # the smaller L, the less support -> obs with negative L are rare in A=0 (rare that those with bad health not treated) -> confirms viol #1
 
 # essence: KBSD identified both critical strata
+# stratum with few support if intervened on A=1: L>0 bc few obs there with L>0 & A=1
+#    "     "        "             "  on A=0: L<0 bc few obs there with L<0 & A=0 that could give intervened-on obs some support
 # but ex. IV = 2: when checking for EDP threshold =100, not all neg are identified
 # i.e. the higher the EDP threshold, the more matches with port results, the more is "covered"
 # but kbsd, esp plotting L values against diag values v useful for first identification of critical strata!
@@ -134,13 +132,15 @@ res1_plot <- kbsd(data = o1,
                   int_data_list = list(o1_1, o1_2),
                   disthalf_vec=c(L=mad(o1$L), A=0.5*mad(o1$A)))
 res1_plot
-# unsuitable: assume that the error is due to mad(A) = 0 ?
+# unsuitable: assume that the error is due to mad(A) = 0 that leads to kernel calc
+# crushing down (bc mad(A)² in denominator)? but there is protection mechanism actually
 
 # 2) IQR for L, A instead of SD
 res1_plot <- kbsd(data = o1,
                   int_data_list = list(o1_1, o1_2),
                   disthalf_vec=c(L=IQR(o1$L), A=0.5*IQR(o1$A)))
 res1_plot
+# slightly better support overall (more optimistic) than for regular calc
 
 # 3) average pairwise distance within L, A
 res1_plot <- kbsd(data = o1,
@@ -148,6 +148,7 @@ res1_plot <- kbsd(data = o1,
                   disthalf_vec=c(L=mean(dist(matrix(o1$L), method = "euclidean")),
                                  A=0.5*mean(dist(matrix(o1$A), method = "euclidean"))))
 res1_plot
+# similar to regular plot
 
 # essence: all have same trend, but good for robustness as less sensitive to outliers compared to SD
 # plots for strata also yield same results for underlying L values
@@ -163,12 +164,13 @@ res1_plot
 sem2 <- DAG.empty() +
   node("age", distr = "rnorm", mean = 50, sd = 10) +
   node("fit", distr = "rbern", prob = ifelse(age > 60, 0.2, 0.65)) +  # fitness depends on age
-  node("A", distr = "rbern", prob = ifelse((age > 60 & fit == 0), 0.95, 1-0.95)) # A1: beta less extreme
-  #node("A", distr = "rbern", prob = ifelse((age > 60 & fit == 0), 0.97, 1-0.97)) # A2
+  #node("A", distr = "rbern", prob = ifelse((age > 60 & fit == 0), 0.95, 1-0.95)) # A1: beta less extreme
+  node("A", distr = "rbern", prob = ifelse((age > 60 & fit == 0), 0.97, 1-0.97)) # A2
   # if old & unfit -> def treated, i.e. P(A=1|old & unfit) should be high
 dag2 <- set.DAG(sem2)
 plotDAG(dag2)
 obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
+table(obs2$A)  # v imbalanced! 
 
 # check how many observations with age > 60
 nrow(obs2[obs2$age > 60 & obs2$fit == 0,])  # as wanted: old & unfit rarely not treated
@@ -188,7 +190,6 @@ nrow(obs2[obs2$age <= 60 & obs2$fit == 1 & obs2$A == 1,])/nrow(obs2[obs2$age <= 
 obs2$age <- cut(obs2$age, breaks = c(0,60,90))
 obs2$age <- cut(obs2$age, breaks = c(0,20,40,60,90))
 
-
 # among A=1
 table(obs2[obs2$A == 1, "age"], obs2[obs2$A == 1, "fit"])
 # among A=0
@@ -197,19 +198,21 @@ table(obs2[obs2$A == 0, "age"], obs2[obs2$A == 0, "fit"])
 
 # PoRT ---
 source('data/port_utils.R')
-lst2 <- list(port = NULL, port_risca = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 gruber2 <- 5/(sqrt(nrow(obs2))*log(nrow(obs2)))
-b_values <- c(0.001, 0.01, gruber2, 0.05, 0.1)  # why 0.001?? to small!!  add 0.02 tho ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-for (a in a_values) {
-  for (b in b_values) {
-    # uncategorised age
-    lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = "age", cov.quali = "fit",
-                                                               data = obs2, alpha = a, beta = b, gamma = 2) 
-    # categorised age
-    #lst2$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"),
-    #                                                           data = obs2, alpha = a, beta = b, gamma = 2)
-    #lst2$port_risca[[paste0("alpha value = ", a)]] <- RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, alpha = a, beta = 0.05, data = obs1, gamma = 1)
+b_values <- c(0.01, gruber2, 0.05, 0.1)
+g_values <- 1:2
+lst2 <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      # uncategorised age
+      #lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
+      #  port(A = "A", cov.quanti = "age", cov.quali = "fit", data = obs2, alpha = a, beta = b, gamma = g) 
+      # categorised age
+      lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
+      port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"), data = obs2, alpha = a, beta = b, gamma = g)
+    }
   }
 }
 lst2
@@ -218,21 +221,21 @@ lst2
 # without categorisation: identical for gamma = 1 and gamma = 2
   # only split by 1 var, as proba.exposure small enough already -> viol 2+3 identified
   # subgroup fit only from beta = 0.1 as expected
-  # viol #4 not detected (would've only been detected for b=0.1 but alr included in viol 2+3)
-  # viol #1 covered for a = 0.01, b = 0.1: covered by age -> split by 1 var was sufficient
-  # -> but don't understand why for beta = 0.05/0.1 and other alphas (as a=0.13) never reported "age > 60" then, only for a = 0.01 subgroup "age > 60 & age < 65"
+  # viol #4 covered by viol 2+3
+  # viol #1 partly covered for a = 0.01, b = 0.1, by age -> split by 1 var was sufficient
+  # -> but for other alphas (as a=0.13) with beta = 0.05/0.1, never reported "age > 60", only for a = 0.01 subgroup "age > 60 & age < 65"
+  # i.e. viol #1 undetected for a=0.02-0.1
 # first categorisation: identical for gamma = 1,2 as only ever split by 1 var
-  # viol #1 neither detected nor covered
-  # too imprecise, identified viol #2 for beta = 0.05, both viol 2+3 for beta = 0.1
+  # viol #1 neither detected nor covered for any alpha & beta =0.1, viol 2+3 for beta = 0.1
 # second categorisation:
   # gamma = 1: same as for first categorisation
   # gamma = 2: viol #1 neither detected nor covered
   #            for alpha=0.01-0.05, beta=gruber: new unexpected subgroup! split with 2 vars
-  #            intersection fit=0 & age=(20,40], as allows for smaller proba.exposure that only intersection of groups fulfills
-  #            else split by 1 var, as above: viol #2 for beta=0.05, viol 2+3 for beta=0.1
+  #            fit=0 & age=(20,40] rarely treated -> confirmed as P(A=1) = 0.016
+  #            as above: det viol #2 for beta=0.05, viol 2+3 for beta=0.1 as should be
 
-# essence: all problematic subgroups detected if not categorised (viol #1 "detected" in terms of covered)
-#          if categorised, all found except viol #1: group of age>60 & fit==0 always treated (sample size prop = 0.13) not even covered
+# essence: all viol except viol #1 "detected"/covered both for uncat & cat (i.e. effect of cat
+#          not that visible yet with few conf) -> viol #1 only partly covered if uncategorised
 #          and 1 new subgroup "fit=0 & age=(20,40]": unfit ppl between 20&40 rarely treated
 
 # for A2:
@@ -272,7 +275,9 @@ res2_plot
 table(o2$A)
 # this table shows that prob so few support for IV=1 due to many obs from A=0
 #  for which we intervened on AND THAT CANNOT BE WELL SUPPORTED BY THE FEW OBS ALR IN A=1
+#  -> i.e. low EDP mainly caused by difference in A for many obs with A=0 getting IV=1, additionally stems from age/fit
 #  -> if obs in one treatment level v scarce alr (A=1), then intervening obs from other on it results in few support for them (in IV=1)
+# check if few support mainly stems from age or fit
 table(cut(obs2$age, breaks = c(0,60,90)))  # distr of A goes hand in hand with
 #  distr of age: those many ppl having A=0 are all mostly young ppl
 
@@ -340,6 +345,66 @@ res2_plot <- kbsd(data = o2,
 res2_plot
 
 
+
+## 2) Two Confounders But Balanced ----
+# Baseline confounders: Age (L1) ~ N(50, 10) and Fitness (L2) ~ Ber(0.05) -> most people in sample are not fit
+# Treatment: BP medication (A) ~ Ber with logit(Age, Fitness)
+# Cont. Outcome: Systolic BP at follow-up (Y) ~ (Age, Treatment)
+
+sem2 <- DAG.empty() +
+  node("age", distr = "rnorm", mean = 50, sd = 10) +
+  node("fit", distr = "rbern", prob = ifelse(age > 60, 0.2, 0.7)) +  # fitness depends on age
+  node("A", distr = "rbern", prob = plogis(2.5*(1-fit) - 3*fit + 4*(age > 60)))
+   # if unfit -> P(A=1)=0.92, if old -> P(A=1) = 0.98, if unfit + old -> P(A=1)~1, if fit -> P(A=1)=0.047
+# if old & unfit -> def treated, i.e. P(A=1|old & unfit) should be high
+dag2 <- set.DAG(sem2)
+plotDAG(dag2)
+obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
+table(obs2$A)  # more balance now
+
+obs2 %>% filter(age > 60 & A==1) %>% nrow()/obs2 %>% filter(age > 60) %>% nrow()  # viol #1: for beta=0.1
+
+obs2 %>% filter(fit == 0 & A==1) %>% nrow()/obs2 %>% filter(fit ==0) %>% nrow()  # viol #2: for beta=0.05,0.1
+
+obs2 %>% filter(age > 60 & fit == 0 & A==1) %>% nrow()/obs2 %>% filter(age > 60 & fit ==0) %>% nrow()  # viol #3: combo of the 2 above with beta = 0.01!
+
+obs2 %>% filter(fit == 1 & A==1) %>% nrow()/obs2 %>% filter(fit ==1) %>% nrow()  # viol #3: for beta=0.1
+
+
+
+# PoRT ---
+source('data/port_utils.R')
+a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
+gruber2 <- 5/(sqrt(nrow(obs2))*log(nrow(obs2)))
+b_values <- c(0.01, gruber2, 0.05, 0.1)
+g_values <- 1:2
+lst2 <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      # uncategorised age
+      #lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
+      #  port(A = "A", cov.quanti = "age", cov.quali = "fit", data = obs2, alpha = a, beta = b, gamma = g) 
+      # categorised age
+      lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"), data = obs2, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst2
+# uncategorised:
+# gamma = 1, 2:
+#   a=0.01/0.02 & b<=gruber: only viol #1, bc age as only cont var that can be split into smaller subgroups
+#   from a=0.03, all detected (or say viol #3 covered by detection of 1,2) for b=0.1 (viol #2 from 0.05) as they should be!
+#   viol #3 (intersecting group) poss to detect for gamma =2, but only covered bc of greedy cat for age
+
+# categorised:
+obs2$age <- cut(obs2$age, breaks = c(0,20,40,60,90))
+# gamma = 1: same as above, always detected from beta = 0.1 (viol #2 from 0.05) as should
+# gamma = 2: now also intersecting group detected! bc no greedy cat by age, rest always det for b=0.1 as wanted
+
+
+
 ## 3) Three Confounders ----
 sem3 <- DAG.empty() +
   node("L1", distr = "rbern", prob = 0.3) +
@@ -349,16 +414,17 @@ sem3 <- DAG.empty() +
 dag3 <- set.DAG(sem3)
 plotDAG(dag3)
 obs3 <- sim(dag3, rndseed = 12082025, n = 1000)
+table(obs3$A)  
 
 # check through all strata
 # gamma = 1
 table(obs3$L1, obs3$A)/rowSums(table(obs3$L1, obs3$A))
 table(obs3$L2, obs3$A)/rowSums(table(obs3$L2, obs3$A))
-table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> expected viol #1 (sample large enough with 386/1000)
+table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> viol #1 for b=0.1 (sample large enough with 386/1000)
 # gamma =2
 table(obs3[obs3$L1 == 0 & obs3$L2 == 0,"A"])
-table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #2 (sample large enough with 278/1000)
-table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # v imbalanced -> expected viol #3 (sample large enough with 346/1000)
+table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # expected viol #2 for b=gruber (sample large enough with 278/1000)
+table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # expected viol #3 for b=0.05 (sample large enough with 346/1000)
 
 table(obs3[obs3$L1 == 0 & obs3$L2 == 1,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L2 == 0,"A"])
@@ -376,30 +442,33 @@ table(obs3[obs3$L2 == 1 & obs3$L3 == 1,"A"])
 
 # PoRT ---
 source('data/port_utils.R')
-lst3 <- list(port = NULL, port_risca = NULL)
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 gruber3 <- 5/(sqrt(nrow(obs3))*log(nrow(obs3)))
-b_values <- c(0.001, 0.01, gruber3, 0.05, 0.1)   # ad 0.02, no longer 0.001?!?????? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-for (a in a_values) {
-  for (b in b_values) {
-    lst3$port[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL, cov.quali = c("L3", "L2", "L1"),
-                                                               data = obs3, alpha = a, beta = b, gamma = 3) 
-    #lst3$port_risca[[paste0("alpha value = ", a)]] <- RISCA::port(group = "A", cov.quanti = "L", cov.quali = NULL, alpha = a, beta = 0.05, data = obs1, gamma = 1)
+b_values <- c(0.01, gruber3, 0.05, 0.1)
+g_values <- 1:3
+lst3 <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst3[[paste0("gamma = ", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL, cov.quali = c("L3", "L2", "L1"),
+             data = obs3, alpha = a, beta = b, gamma = g) 
+    }
   }
 }
 lst3
 # gamma = 1:
   # only for b = 0.1 the one wanted subgroup with L3=0 was detected; makes sense bc proba.exposure=0.073 which is only <0.1, not <0.05 etc.
 # gamma = 2:
-  # never v small proba.exposure (< gruber)
+  # all 3 viol detected for appropriate beta values
   # BEST COMBO: any alpha, b = 0.05 to find all 3 viol (beta=gruber/0.1 only find 1 critical subgroup each)
 # gamma = 3:
-  # same as gamma = 2, but now for smaller beta also found subgroups with L1&L2&L3 intersection
+  # same as gamma = 2, but also one new subgroup with L1&L2&L3 intersection!
   # reason: proba.exposure not extreme enough for split by 1 var/by 2 vars, so continued to 
   #         build tree with splits by 3 vars where a viol was eventually found
 
-# essence: all violations found, even one more (L3=0 & L1=0 & L2=0)
-#          but only if aggregate results from diff HP values, never all 3 viol at once
+# essence: all violations found, even one more (L3=0 & L1=0 & L2=0) -> check if really so scarce
+obs3 %>% filter(L3==0 & L1==0 & L2==0 & A==1) %>% nrow()/obs3 %>% filter(L3==0 & L1==0 & L2==0) %>% nrow() # it is
 
 
 # KBSD ---
@@ -425,12 +494,13 @@ obs3[subset_5$observation, ]
 table(obs3[subset_5$observation, ][, c("L1", "L2")]) # many L1=0 & L2=0 among treated, but among L1=0 & L2=0 still enough treated&untreated (proba.exposure not extreme)
 table(obs3[subset_5$observation, ][, c("L1", "L3")]) # confirmed that many from L3=0 & L1=0, ACTUALLY from L3=0
 table(obs3[subset_5$observation, ][, c("L2", "L3")]) # confirmed that many from L3=0 & L2=0
+
 # check additional group that port returned: how many among L3=0 & L1=0 & L2=0 treated/untreated:
 table(obs3[obs3$L3==0 & obs3$L1==0 & obs3$L2==0, "A"])  # no one treated -> valid 
-  # detected by kbsd as detected by port!
 table(obs3[subset_5$observation, ][, "L1"],
       obs3[subset_5$observation, ][, "L2"],
-      obs3[subset_5$observation, ][, "L3"])  # kbsd shows that they most small EDP from there
+      obs3[subset_5$observation, ][, "L3"]) # kbsd shows that they most small EDP from there -> det by kbsd as det by port!
+
 
 # what strata are those with low support for untreated (IV = 2)
 subset_6 <- res3[res3$diagnostic < 50 & res3$shift == 2,]
@@ -454,4 +524,4 @@ table(o3$A)  # also: way more untreated compared to treated in general!
 # prob similar results as above
 mad(o3$A)  # mad unsuitable
 IQR(o3$A)  # using IQR would be suitable here, treatment distr not as imbalanced as in 2 Conf setting
-summary(o3$A)
+
