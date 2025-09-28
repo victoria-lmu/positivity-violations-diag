@@ -174,7 +174,7 @@ table(obs2$A)  # v imbalanced!
 
 # check how many observations with age > 60
 nrow(obs2[obs2$age > 60 & obs2$fit == 0,])  # as wanted: old & unfit rarely not treated
-  # expected viol #1: P(A=0|age >60 & fit == 0) = 0.046, i.e. should be found with b=0.05/0.1, sample size large enough with 130/1000= 0.13
+  # expected viol #1: P(A=0|age >60 & fit == 0) = 0.046 (0.023), i.e. should be found with b=0.05/0.1, sample size large enough with 130/1000= 0.13
 
 nrow(obs2[obs2$age <= 60 & obs2$A == 1,])/nrow(obs2[obs2$age <= 60,])  # young rarely treated
   # expected viol #2: P(A=1|age <= 75)~0, sample size large enough with 835/1000
@@ -350,11 +350,11 @@ res2_plot
 # Baseline confounders: Age (L1) ~ N(50, 10) and Fitness (L2) ~ Ber(0.05) -> most people in sample are not fit
 # Treatment: BP medication (A) ~ Ber with logit(Age, Fitness)
 # Cont. Outcome: Systolic BP at follow-up (Y) ~ (Age, Treatment)
-
+set.seed(15082025)
 sem2 <- DAG.empty() +
   node("age", distr = "rnorm", mean = 50, sd = 10) +
   node("fit", distr = "rbern", prob = ifelse(age > 60, 0.2, 0.7)) +  # fitness depends on age
-  node("A", distr = "rbern", prob = plogis(2.5*(1-fit) - 3*fit + 4*(age > 60)))
+  node("A", distr = "rbern", prob = plogis(4*(age > 60) + 2.5*(1-fit) - 3*fit))
    # if unfit -> P(A=1)=0.92, if old -> P(A=1) = 0.98, if unfit + old -> P(A=1)~1, if fit -> P(A=1)=0.047
 # if old & unfit -> def treated, i.e. P(A=1|old & unfit) should be high
 dag2 <- set.DAG(sem2)
@@ -404,13 +404,32 @@ obs2$age <- cut(obs2$age, breaks = c(0,20,40,60,90))
 # gamma = 2: now also intersecting group detected! bc no greedy cat by age, rest always det for b=0.1 as wanted
 
 
+# KBSD ---
+source("kbsd.R")
+# revert categorisation
+obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
+
+o2 <- obs2[-1]
+o2_1 <- o2
+o2_1$A <- 1
+o2_2 <- o2
+o2_2$A <- 0
+res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), disthalf_vec=c(age=10, fit=0.5, A=0.5*0.4),  # half of the SD for A!
+             plot.out = F)
+res2_plot <- kbsd(data = o2,
+                  int_data_list = list(o2_1, o2_2),
+                  disthalf_vec=c(age=10, fit = 0.5, A=0.2))
+res2_plot
+
+
+
 
 ## 3) Three Confounders ----
 sem3 <- DAG.empty() +
   node("L1", distr = "rbern", prob = 0.3) +
   node("L2", distr = "rbern", prob = 0.1) + 
   node("L3", distr = "rbern", prob = 0.6) +
-  node("A", distr = "rbern", prob = 0.2*L1 + 0.3*L2 + 0.4*L3)  # if L1, L2, L3=1 -> prob A=1
+  node("A", distr = "rbern", prob = 0.26*L1 + 0.31*L2 + 0.42*L3)  # if L1, L2, L3=1 -> prob A=1
 dag3 <- set.DAG(sem3)
 plotDAG(dag3)
 obs3 <- sim(dag3, rndseed = 12082025, n = 1000)
@@ -423,8 +442,8 @@ table(obs3$L2, obs3$A)/rowSums(table(obs3$L2, obs3$A))
 table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> viol #1 for b=0.1 (sample large enough with 386/1000)
 # gamma =2
 table(obs3[obs3$L1 == 0 & obs3$L2 == 0,"A"])
-table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # expected viol #2 for b=gruber (sample large enough with 278/1000)
-table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # expected viol #3 for b=0.05 (sample large enough with 346/1000)
+table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # expected viol #2: P(A=1)~0 for b=gruber (sample large enough with 27.8%)
+table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # expected viol #3: P(A=1)~0 for b=0.1 (sample large enough with 34.6%)
 
 table(obs3[obs3$L1 == 0 & obs3$L2 == 1,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L2 == 0,"A"])
@@ -438,6 +457,10 @@ table(obs3[obs3$L2 == 1 & obs3$L3 == 0,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L2 == 1,"A"])
 table(obs3[obs3$L1 == 1 & obs3$L3 == 1,"A"])
 table(obs3[obs3$L2 == 1 & obs3$L3 == 1,"A"])
+# gamma = 3
+obs3 %>% filter(L1==1 & L2==1 & L3==1 & A==1) %>% nrow()/
+  obs3 %>% filter(L1==1 & L2==1 & L3==1) %>% nrow()  # expected viol #4: P(A=1)~1 for beta = 0.05/0.1
+
 
 
 # PoRT ---
@@ -463,11 +486,12 @@ lst3
   # all 3 viol detected for appropriate beta values
   # BEST COMBO: any alpha, b = 0.05 to find all 3 viol (beta=gruber/0.1 only find 1 critical subgroup each)
 # gamma = 3:
-  # same as gamma = 2, but also one new subgroup with L1&L2&L3 intersection!
-  # reason: proba.exposure not extreme enough for split by 1 var/by 2 vars, so continued to 
-  #         build tree with splits by 3 vars where a viol was eventually found
+  # for a=0.01, viol #4 with L1==1 & L2==1 & L3==1 -> P(A=1)~1 should have been found
+  # but instead, its complement with L1=0&L2=0&L3=0 -> P(A=1)~0 was found for b=0.01!
+  # reason: only for tree with split by 3 vars, a stratum with such an extreme beta could be found
+  #         proba.exposure not extreme enough for split by 1 var/by 2 vars, so continued to build tree
 
-# essence: all violations found, even one more (L3=0 & L1=0 & L2=0) -> check if really so scarce
+# essence: all violations except #4 were found, but #4 was found indirectly (L3=0 & L1=0 & L2=0) -> check if really so scarce
 obs3 %>% filter(L3==0 & L1==0 & L2==0 & A==1) %>% nrow()/obs3 %>% filter(L3==0 & L1==0 & L2==0) %>% nrow() # it is
 
 

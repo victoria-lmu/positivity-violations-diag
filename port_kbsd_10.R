@@ -13,7 +13,7 @@ set.seed(22092025)
 
 # L1-L10 (mix of cont & binary)
 DAG <- DAG.empty() +
-  node("L1", distr = "rnorm", mean = 1, sd = 1) +
+  node("L1", distr = "rnorm", mean = 1, sd = 1) +  # sd=10 did not change det of viol above, just shifted other viol (i.e. gamma=1,2)
   node("L2", distr = "rnorm", mean = 2, sd = 1) +
   node("L3", distr = "rnorm", mean = 3, sd = 1) +
   node("L4", distr = "rnorm", mean = 4, sd = 1) +
@@ -24,11 +24,11 @@ DAG <- DAG.empty() +
   node("L9", distr = "rbern", prob = 0.5) +
   node("L10", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(2*L6*L7*L8))  # A only depends on these conf;
-# should help characterising problematic strata (nonlinear function of bernoulli L)
+# if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.88
 DAG <- DAG 
 DAG <- set.DAG(DAG)
 dat <- sim(DAG, n = 1000)
-table(dat$A)  # good that not too imbalanced
+table(dat$A)  # balanced
 
 # table to check for extreme treatment probs only for binary conf: results in table of dimension 2^5
 make_strata_table <- function(dat, A = "A", binary_vars){
@@ -63,6 +63,9 @@ for (g in g_values) {
   }
 }
 lst5
+# sink("port_10_uncat_sd10.txt")
+# print(lst5)
+# sink()
 # gamma = 1,2: predefined critical stratum not yet poss to cover bc intersection of 3
 #  -> so other viol among cont conf, but only for alpha=0.01/0.02
 #     (where small groups poss -> reason: greedy categorisation esp for small alphas)
@@ -105,7 +108,7 @@ for (g in g_values) {
 lst5_cat
 # gamma = 1: no critical subgroup
 # gamma = 2: one critical subgroup for alpha = 0.01, but v small
-# gamma = 3-10: detected for all alpha & beta = 0.1, except alpha = 0.01 & alpha = 0.02 now too!?!
+# gamma = 3-10: detected for all alpha & beta = 0.1, except alpha = 0.01 & alpha = 0.02
 # -> shows importance of categorising cont conf!! also computationally faster
 # -> weird that not for alpha = 0.01 as in uncategorised case.. so in case of categorisation,
 #     if a=0.01 (too small alpha) lets focus on small strata only?? but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation
@@ -136,13 +139,18 @@ res5_plot
 
 # what strata are those with low support for treated (IV = 1)
 subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
-o5[subset_5_1$observation, ]
-# did not built in viol here on purpose so would have to search in detail which underlying covar values
+table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
+# those with few support in IV=1 are L6=0 & L7=0 & L8=0, NOT L6=1 & L7=1 & L8=1 -> viol found
+table(o5[subset_5_1$observation, c("L9", "L10")])
+# many from L9=1 & L10=0 that have low support in IV=1
 
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 o5[subset_5_2$observation, ]
-table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among untreated is L8=1 & L6=1 & L7=1 -> as expected
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# bottomline: PoRT directly returns strata (can check if sensible in context > don't need to know viol in advance),
+#             for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
 
 
 # disthalf_vec: best case values, i.e. double values <=> kernel less steep
@@ -176,17 +184,39 @@ summary(o5$A)
 ### formula for EDP for high-dim covar set ----
 
 # type = "minval" instead of default type = "Rfast"
-res5 <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
+res5_mv_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
+             minval_vec = rep(0.5, 11),
              disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
                             L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                             A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
+             plot.out = T)
+ggsave("kbsd_10_mv.png")
+res5_mv <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
+                minval_vec = rep(0.5, 11),
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                plot.out = F)
+
+# sink("kbsd_10_mv.txt")
+# print(res5_mv)
+# sink()
+# did not work with minval????????????????????????????????????????
+
+
 # type = "harmonicmean" instead of default type = "Rfast"
-res5 <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
-                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
-                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
-
-
+res5_hm_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                     disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                     L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                     A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                     plot.out = T)
+ggsave("kbsd_10_hm.png", width = 6, height = 3)
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                     disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                    L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                    A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                     plot.out = F)
+sink("kbsd_10_hm.txt")
+print(res5_hm)
+sink()
 

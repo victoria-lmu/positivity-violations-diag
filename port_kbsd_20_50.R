@@ -41,7 +41,27 @@ port("A", cov.quanti = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L1
      cov.quali = c("L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
      data = dat2, alpha = 0.05, beta = 0.1, gamma = 3)
 # gamma = 2: always b = 0.1, undetected: a=0.01/0.02/gruber/0.05 (too small alpha lets algo focus on smaller strata?), det: a=0.1, 0.04, 0.03
-# gamma = 3: undet: a=0.01, 0.02, 0.05, gruber, det: a=0.03, 0.04, 0.1
+# gamma = 3: same as gamma =2
+
+a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
+g_values <- 1:20
+lst20 <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst20[[paste0("gamma = ", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A",cov.quanti = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
+                                    "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
+             cov.quali = NULL, data = dat2, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst20
+# sink("port_20_uncat.txt")
+# print(lst20)
+# sink()
+
 
 ## PoRT: continuous vars categorised ----
 
@@ -60,18 +80,24 @@ port("A", cov.quanti = NULL,
 
 a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
-lst6_cat <- list()
-for (a in a_values) {
-  for (b in b_values) {
-    lst6_cat[[paste0("alpha = ", a, ", beta = ", b)]] <- port(A = "A", cov.quanti = NULL,
-                                                              cov.quali = c("L1", "L2", "L3", "L4", "L5",
-                                                                            "L6", "L7", "L8", "L9", "L10",
-                                                                            "L11", "L12", "L13", "L14", "L15",
-                                                                            "L16", "L17", "L18", "L19", "L20"),
-                                                              data = dat2_cat, alpha = a, beta = b, gamma = 20)
+lst20_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst20_cat[[paste0("gamma = ", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL, cov.quali = c("L1", "L2", "L3", "L4", "L5",
+                                                       "L6", "L7", "L8", "L9", "L10",
+                                                       "L11", "L12", "L13", "L14", "L15",
+                                                       "L16", "L17", "L18", "L19", "L20"),
+             data = dat2_cat, alpha = a, beta = b, gamma = g)
+    }
   }
 }
-lst5_cat
+lst20_cat
+# sink("port_20_cat.txt")
+# print(lst20_cat)  # rename to lst20
+# sink()
+
 
 # broader categorisation
 dat2_cat <- dat2
@@ -109,6 +135,18 @@ res6 <- kbsd(data = o6,
 #    was warned for in kbsd paper
 # -> but interesting that among IV=1 (bringing all to A=1), particularly low support (many with EDP = 0)
 
+# what strata are those with low support for treated (IV = 1)
+subset_6_1 <- res6[res6$diagnostic <= median(res6[res6$shift == 1, "diagnostic"]) & res6$shift == 1,]  # many obs with v low EDP
+table(o6[subset_6_1$observation, c("L19", "L20")])
+# those with few support in IV=1 are L19=0 & L20=0 -> viol found
+
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_6_2 <- res6[res6$diagnostic < median(res6[res6$shift == 2, "diagnostic"]) & res6$shift == 2,]
+o6[subset_6_2$observation, ]
+table(o6[subset_6_2$observation, c("L19", "L20")]) # highest count among IV=0 is L19=1 & L20=1
+# (don't have much support among A=0 as obs with these values are mostly treated) -> as expected
+
+
 
 ### alternative EDP calc for high-dim covar set ----
 
@@ -120,7 +158,7 @@ res6 <- kbsd(data = o6, int_data_list = list(o6_1, o6_2), type = "minval",
                             L11=sd(o6$L11), L12 = sd(o6$L12), L13 = sd(o6$L13), L14 = sd(o6$L14), L15 = sd(o6$L15),
                             L16 = sd(o6$L16), L17 = sd(o6$L17), L18 = sd(o6$L18), L19 = sd(o6$L19), L20 = sd(o6$L20),
                             A=0.5*sd(o6$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             minval_vec = , plot.out = T)
 # type = "harmonicmean" instead of default type = "Rfast"
 res6 <- kbsd(data = o6, int_data_list = list(o6_1, o6_2), type = "harmonicmean",
              disthalf_vec=c(L1=sd(o6$L1), L2 = sd(o6$L2), L3 = sd(o6$L3), L4 = sd(o6$L4), L5 = sd(o6$L5),
