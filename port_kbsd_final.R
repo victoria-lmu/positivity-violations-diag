@@ -6,23 +6,22 @@ source("setup.R")
 # Treatment: BP medication (A) ~ Ber with logit(Age, Fitness)
 set.seed(15082025)
 sem2 <- DAG.empty() +
-  node("age", distr = "rnorm", mean = 50, sd = 10) +
-  node("fit", distr = "rbern", prob = ifelse(age > 60, 0.2, 0.7)) +  # fitness depends on age
-  node("A", distr = "rbern", prob = plogis(4*(age > 60) + 2.5*(1-fit) - 3*fit))
-# if unfit -> P(A=1)=0.92, if old -> P(A=1) = 0.98, if unfit + old -> P(A=1)~1, if fit -> P(A=1)=0.047
+  node("L1", distr = "rnorm", mean = 50, sd = 10) +
+  node("L2", distr = "rbern", prob = ifelse(L1 > 60, 0.2, 0.7)) +  # L2ness depends on L1
+  node("A", distr = "rbern", prob = plogis(4*(L1 > 60) + 2.5*(1-L2) - 3*L2))
+# if unfit -> P(A=1)=0.92, if old -> P(A=1) = 0.98, if unfit + old -> P(A=1)~1, if L2 -> P(A=1)=0.047
 # if old & unfit -> def treated, i.e. P(A=1|old & unfit) should be high
 dag2 <- set.DAG(sem2)
 plotDAG(dag2)
 obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
-table(obs2$A)  # more balance now
+table(obs2$A)  # balanced
 
-obs2 %>% filter(age > 60 & A==1) %>% nrow()/obs2 %>% filter(age > 60) %>% nrow()  # viol #1: for beta=0.1
+obs2 %>% filter(L1 > 60 & A==1) %>% nrow()/obs2 %>% filter(L1 > 60) %>% nrow()  # viol #1: for beta=0.1
 
-obs2 %>% filter(fit == 0 & A==1) %>% nrow()/obs2 %>% filter(fit ==0) %>% nrow()  # viol #2: for beta=0.05,0.1
+obs2 %>% filter(L2 == 0 & A==1) %>% nrow()/obs2 %>% filter(L2 ==0) %>% nrow()  # viol #2: for beta=0.05,0.1
+obs2 %>% filter(L1 > 60 & L2 == 0 & A==1) %>% nrow()/obs2 %>% filter(L1 > 60 & L2 ==0) %>% nrow()  # viol #3: combo of the 2 above with beta = 0.01!
 
-obs2 %>% filter(age > 60 & fit == 0 & A==1) %>% nrow()/obs2 %>% filter(age > 60 & fit ==0) %>% nrow()  # viol #3: combo of the 2 above with beta = 0.01!
-
-obs2 %>% filter(fit == 1 & A==1) %>% nrow()/obs2 %>% filter(fit ==1) %>% nrow()  # viol #3: for beta=0.1
+obs2 %>% filter(L2 == 1 & A==1) %>% nrow()/obs2 %>% filter(L2 ==1) %>% nrow()  # viol #4: for beta=0.1
 
 
 # PoRT ---
@@ -35,46 +34,75 @@ lst2 <- list()
 for (g in g_values) {
   for (a in a_values) {
     for (b in b_values) {
-      # uncategorised age
+      # uncategorised L1
       #lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
-      #  port(A = "A", cov.quanti = "age", cov.quali = "fit", data = obs2, alpha = a, beta = b, gamma = g) 
-      # categorised age
+      #  port(A = "A", cov.quanti = "L1", cov.quali = "L2", data = obs2, alpha = a, beta = b, gamma = g) 
+      # categorised L1
       lst2[[paste0("gamma = ",g, ", alpha = ", a, ", beta = ", b)]] <-
-        port(A = "A", cov.quanti =NULL, cov.quali = c("age", "fit"), data = obs2, alpha = a, beta = b, gamma = g)
+        port(A = "A", cov.quanti =NULL, cov.quali = c("L1", "L2"), data = obs2, alpha = a, beta = b, gamma = g)
     }
   }
 }
 lst2
 # uncategorised:
 # gamma = 1, 2:
-#   a=0.01/0.02 & b<=gruber: only viol #1, bc age as only cont var that can be split into smaller subgroups
+#   a=0.01/0.02 & b<=gruber: only viol #1, bc L1 as only cont var that can be split into smaller subgroups
 #   from a=0.03, all detected (or say viol #3 covered by detection of 1,2) for b=0.1 (viol #2 from 0.05) as they should be!
-#   viol #3 (intersecting group) poss to detect for gamma =2, but only covered bc of greedy cat for age
+#   viol #3 (intersecting group) poss to detect for gamma =2, but only covered bc of greedy cat for L1
+#   also, young pp being treated rarely is detected for a=0.01! for that it's useful to do sensitivity ana
 
 # categorised:
-obs2$age <- cut(obs2$age, breaks = c(0,20,40,60,90))
+obs2$L1 <- cut(obs2$L1, breaks = c(0,20,40,60,90))
 # gamma = 1: same as above, always detected from beta = 0.1 (viol #2 from 0.05) as should
-# gamma = 2: now also intersecting group detected! bc no greedy cat by age, rest always det for b=0.1 as wanted
+# gamma = 2: now also intersecting group detected! bc no greedy cat by L1, rest always det for b=0.1 as wanted
 
 
 # KBSD ---
 source("kbsd.R")
-# revert categorisation
-obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
-
+# revert categorisation, i.e need cont L1, L2 again!
 o2 <- obs2[-1]
 o2_1 <- o2
 o2_1$A <- 1
 o2_2 <- o2
 o2_2$A <- 0
-res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), disthalf_vec=c(age=10, fit=0.5, A=0.5*0.4),  # half of the SD for A!
+res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), disthalf_vec=c(L1=10, L2=0.5, A=0.5*0.4),  # half of the SD for A!
              plot.out = F)
 res2_plot <- kbsd(data = o2,
                   int_data_list = list(o2_1, o2_2),
-                  disthalf_vec=c(age=10, fit = 0.5, A=0.2))
+                  disthalf_vec=c(L1=10, L2 = 0.5, A=0.2))
 res2_plot
+# visibly more support for IV=2 (A=0)
+table(obs2$A)
 
+# expected viol (confirmed by PoRT): age > 60, fit = 1, fit = 0
 
+# what strata are those with low EDP in IV = 1 (A=1)
+shift1 <- res2[res2$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(res2[res2$shift==1, "diagnostic"], probs = 0.25)  # outliers (below whiskers' ends)
+l_values1 <- obs2[outliers1, "L1"] 
+diag_values1 <- shift1[outliers1,]
+plot(l_values1, diag_values1$diagnostic)
+# most are v young -> makes sense bc young ppl rarely treated but probs not extreme enough (only for a=0.01) relevant,
+# but also some v old ppl! but NB: 4 outliers with high EDP?
+l_values1 <- obs2[outliers1, "L2"]
+diag_values1 <- shift1[outliers1,]
+plot(l_values1, diag_values1$diagnostic)
+# most with few support for A=1 have L2=1, i.e. are fit -> makes sense bc when trying to
+# intervene fit ppl on A=1, only few other obs as fit ppl rarely treated
+
+# what strata are those with low EDP in IV = 2 (A=0)
+shift2 <- res2[res2$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(res2[res2$shift==2, "diagnostic"], probs = 0.05)
+l_values2 <- obs2[outliers2, "L1"] 
+diag_values2 <- shift2[outliers2,]
+plot(l_values2, diag_values2$diagnostic)
+# most with few EDP are v old pp (but also some v young ones!) -> sensible bc few old ppl
+# that got A=0 so that few support for such obs if IV02 (A00)
+l_values2 <- obs2[outliers2, "L2"] 
+diag_values2 <- shift2[outliers2,]
+plot(l_values2, diag_values2$diagnostic)
+# most with few support for A=0 are those with L2=0, i.e. unfit ppl bc unfit ppl are
+# usually treated so that if intervene on A=0 for them, few unfit obs in neighbourhood
 
 
 # 3 Confounders Version 1 ----
@@ -315,11 +343,10 @@ for (g in g_values) {
 }
 lst5_cat
 #sink("port_3_bimodal_cat.txt")
-# gamma = 1: detected viol #1
-# gamma = 2, 3: best example for info loss that can occur due to categorisation!!
-#               stratum where intersection with L2=0 (L2=0 & L3< 5.626 & L3>=5.199)
-#               is not included anymore bc categorisation too broad so that extreme
-#               proba that is in L2=0 & (L3< 5.626 & L3>=5.199), does not exist in (4,6]&L2=0 anymore
+# gamma = 1, 2, 3: det viol #1 but best example for info loss that can occur due to categorisation!!
+#                  stratum where intersection with L2=0 (L2=0 & L3< 5.626 & L3>=5.199)
+#                  is not included anymore bc categorisation too broad so that extreme
+#                  proba that is in L2=0 & (L3< 5.626 & L3>=5.199), does not exist in (4,6]&L2=0 anymore
 
 
 # essence: in both categorised & uncat both viol are found, but without categorisation,
@@ -348,21 +375,22 @@ table(data1$A)  # see that alr fewer support among IV=1 bc fewer obs in A=1
 
 # acc to viol, few support for IV=1 (A=1) if would estimate Y|A=1 further, for subgroup L3=(4,6]:
 shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.05)  # create indices for the "outliers"
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
 l_values1 <- data1[outliers1, "L3"]  # to which original obs (L values) do these outliers belong?
 diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
 plot(l_values1, diag_values1$diagnostic)
 
-# interesting: expected those in [4,6] to have lowest EDP/support, but they're almost judged to have most
-#              also why this pattern in the plot?
+# interesting: for threshold =0.05, expected those in [4,6] to have lowest EDP/support, 
+#              but they're almost judged to have most
+#              for threshold =0.25 also quite a few in [4,6] with high EDP & why this pattern in the plot?
 
 l_values1 <- data1[outliers1, "L1"]
 diag_values1 <- shift1[outliers1,]
-plot(l_values1, diag_values1$diagnostic)  # clear trend for L1 tho: those with L1=1 have few support for IV=1
+plot(l_values1, diag_values1$diagnostic)  # clear trend for L1 tho: those with few support for IV=1 mostly have L1=1 
 
-l_values1 <- data1[outliers1, "L2"]  # to which original obs (L values) do these outliers belong?
-diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
-plot(l_values1, diag_values1$diagnostic)
+l_values1 <- data1[outliers1, "L2"]
+diag_values1 <- shift1[outliers1,]
+plot(l_values1, diag_values1$diagnostic)  # more scattered here, so few EDP mostly for L2=0
 
 # also check for IV=2
 shift2 <- res5[res5$shift == 2,]
@@ -373,7 +401,8 @@ plot(l_values2, diag_values2$diagnostic)
 # no clear pattern: obv less support for tails bc fewer obs there (did not have viol with P(A=0)~0)
 
 
-# essence: seems like kbsd cannot detect that for IV=1 there is low support for L3 =[4,6], couldn't detect the hole!?!?!!!
+# essence: seems like kbsd cannot PINPOINT that for IV=1 there is low support for L3 =[4,6], i.e. the "hole"
+#          whereas PoRT could
 
 
 
@@ -392,17 +421,14 @@ sem1 <- DAG.empty() +
   node("L4", distr = "rbern", prob = 0.1) +
   node("L5", distr = "rbern", prob = 0.2) +
   node("A", distr = "rbern", prob = plogis(0.2*L1 + 0.3*L2 + 0.1*L4 + 0.3*L5 - 0.5*L3*(L3 < 6)))
+# all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
 data1 <- sim(dag1, n = 1000)
 
 plot(density(data1$L3), main = "bimodal L3 distribution from mixture") # again expect viol in [4,6]
 
-data1 %>% filter(L3 < 4 & A==1) %>% nrow()/
-  data1 %>% filter(L3 < 4) %>% nrow()
-
-data1 %>% filter(L3 > 6 & A==1) %>% nrow()/
-  data1 %>% filter(L3 > 6) %>% nrow()
+# never any extreme P(A) for L1, L2, L4, L5 and their intersections, but for when L3 is involved:
 
 data1 %>% filter(L3 >= 4 & L3 <= 6 & A==1) %>% nrow()/
   data1 %>% filter(L3 >= 4 & L3 <= 6) %>% nrow()  # viol #1: if L3 in [4,6], sample prop = 15.2% -> should find for g>=1, b=0.1
@@ -501,4 +527,143 @@ plot(l_values2, diag_values2$diagnostic)
 data1 %>% filter(L3 < 6 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow()
 # but actually many obs among A=0 with such values, also EDP threshold here v low
 # so prob enough support overall (also did not have viol with P(A=0)~0)
+
+
+
+# 10 Confounders ----
+
+set.seed(29092025)
+L3_1 <- rnorm(500, 3, 1)
+L3_2 <- rnorm(500, 7, 1)
+L3_1_2 <- c(L3_1, L3_2)
+plot(density(L3_1_2))
+sem1 <- DAG.empty() +
+  node("L1", distr = "rbern", prob = 0.1) +
+  node("L2", distr = "rbern", prob = 0.2) +
+  node("L3", distr = "rconst", const = L3_1_2) +  # L3 follows a bimodal distribution,
+  #        where vals around 5 have v low prob & vals to left & right have higher prob
+  node("L4", distr = "rbern", prob = 0.1) +
+  node("L5", distr = "rbern", prob = 0.2) +
+  node("L6", distr = "rbern", prob = 0.1) +
+  node("L7", distr = "rbern", prob = 0.2) +
+  node("L8", distr = "rbern", prob = 0.1) +
+  node("L9", distr = "rbern", prob = 0.2) +
+  node("L10", distr = "rbern", prob = 0.1) +
+  node("A", distr = "rbern", prob = plogis(0.2*L1 + 0.3*L2 + 0.1*L4 + 0.3*L5 - 0.5*L3*(L3 < 6)))
+# all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
+dag1 <- set.DAG(sem1)
+plotDAG(dag1)
+data1 <- sim(dag1, n = 1000)
+
+data1 %>% filter(L3> 4 & L3 <6 & A==1) %>% nrow()/data1 %>% filter(L3 <6) %>% nrow()  # viol for g>=1, b>=0.05, sample prop =57.4%
+
+
+## PoRT: continuous var L3 uncategorised ----
+source("data/port_utils.R")
+lst5 <- list()
+a_values <- c(0.01, 0.025, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(data1))), 0.05, 0.1)
+g_values <- 1:10
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = c("L3"),
+             cov.quali = c("L1", "L2", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5
+# gamma = 1:
+# gamma = 2-10: 
+
+
+## PoRT: continuous var L3 categorised ----
+data1_cat <- data1
+source("data/port_utils.R")
+data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 4, 6, 8, Inf))
+lst5_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL,
+             cov.quali = c("L1", "L2", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5_cat
+# gamma = 1:
+# gamma = 2: 
+# gamma = 3-10:
+
+
+# KBSD ---
+source("kbsd.R")
+set.seed(20092025)
+o5 <- data1[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)), plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+res5_plot  # again fewer support for IV=1 & NB: lower EDP overall bc more dims <=> more diff for obs to be close
+table(data1$A)  # which alr indicated here by fewer obs in A=1
+
+
+# acc to viol, few support for IV=1 (A=1) if would estimate Y|A=1 further, for subgroup L3=(4,6]:
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
+l_values1 <- data1[outliers1, "L3"]  # to which original obs (L values) do these outliers belong?
+diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
+plot(l_values1, diag_values1$diagnostic)
+# now clearer that L3 around 5 have fewer EDP than surrounding values! so problem of dimensionality or random?
+# shows that if we intervened all on A=1, those with L3 around 5 have fewer support which reflects
+# that there just don't exist many obs with L3~5 & A=1
+
+# also check for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.05)  # create indices for the "outliers"
+l_values2 <- data1[outliers2, "L3"]  # original L3 values
+diag_values2 <- shift1[outliers2,] # diag values
+plot(l_values2, diag_values2$diagnostic)
+
+### formula for EDP for high-dim covar set ----
+
+# type = "minval" instead of default type = "Rfast"
+res5_mv_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
+                     minval_vec = rep(0.5, 11),
+                     disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                    L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                    A=0.5*sd(o5$A)), plot.out = T)
+#ggsave("kbsd_10_mv.png")
+res5_mv <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
+                minval_vec = rep(0.5, 11),
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)), plot.out = F)
+
+# type = "harmonicmean" instead of default type = "Rfast"
+res5_hm_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                     disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                    L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                    A=0.5*sd(o5$A)), plot.out = T)
+#ggsave("kbsd_10_hm.png", width = 6, height = 3)
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)), plot.out = F)
 
