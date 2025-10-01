@@ -4,12 +4,6 @@ source("setup.R")
 
 set.seed(22092025)
 #  do not use for loop anymore: returned weird obs -> rnorm obs were all similar 
-# for (i in 1:5) {
-#   DAG <- DAG + node(paste0("L", i), distr = "rnorm", mean = i, sd = 1)
-# }
-# for (i in 6:10) {
-#   DAG <- DAG + node(paste0("L", i), distr = "rbern", prob = 0.5)
-# }
 
 # L1-L10 (mix of cont & binary)
 DAG <- DAG.empty() +
@@ -38,19 +32,23 @@ make_strata_table <- function(dat, A = "A", binary_vars){
       n      = n(),
       n_treat = sum(.data[[A]] == 1),
       n_control = sum(.data[[A]] == 0),
-      proba_exp= mean(.data[[A]] == 1), .groups = "drop") %>%
+      proba_exp= mean(.data[[A]] == 1), .groups = "drop",
+      sample_prop = n()/nrow(dat)) %>%
     arrange(proba_exp)
 }
 binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
 print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
-# as wanted: all violating subgroups have L8=1 & L6=1 & L7=1 (NB: overall only have extremely HIGH proba_exp, not extr LOW)
-# sample size of L8=1 & L6=1 & L7=1: 0.13, proba_exp = 123/136 = 0.904 i.e. to detect with any alpha & beta = 0.1
+# as wanted: all violating subgroups have L8=1 & L6=1 & L7=1, optionally L9=0 & 
+#      sample large enough if with L9&L10 alr 3% (NB: overall only have extremely HIGH proba_exp, not extr LOW)
+# in fact, sample prop of L8=1 & L6=1 & L7=1: 13.6%, proba_exp = 123/136 = 0.904 i.e. to detect with any a & b = 0.1
+dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
 
 
 ## PoRT: continuous vars uncategorised ----
 source("data/port_utils.R")
 lst5 <- list()
-a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
+a_values <- c(0.01, 0.025, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
 g_values <- 1:10
 for (g in g_values) {
@@ -63,20 +61,19 @@ for (g in g_values) {
   }
 }
 lst5
-# sink("port_10_uncat_sd10.txt")
+# sink("port_10_uncat.txt")
 # print(lst5)
 # sink()
-# gamma = 1,2: predefined critical stratum not yet poss to cover bc intersection of 3
-#  -> so other viol among cont conf, but only for alpha=0.01/0.02
-#     (where small groups poss -> reason: greedy categorisation esp for small alphas)
-#  -> the smaller you alow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
+# gamma = 1,2: irrelevant for defined critical stratum bc not yet poss to cover as intersection of 3
+#  -> so other viol among cont conf, but only for alpha=0.01/0.02 (v small, prob meaningless viol)
+#  -> the smaller you allow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
 # gamma = 3-10: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
 #  -> included for a=0.01/0.05/0.1 (& beta=0.1), BUT never for a=0.02/0.03/0.04 (& beta=0.1)
 
 
-port("A", cov.quali = c("L6", "L7", "L8", "L9", "L10"),
+port("A", cov.quali = c("L7", "L8", "L9", "L6", "L10"),
      cov.quanti = c( "L2", "L1", "L3", "L4"), data = dat, alpha = 0.01, beta = 0.1, gamma = 4)
-# important finding: order of specifying CONTINUOUS covars as argument matters -> returns diff subgroups!  ~~~~~~~~~~ seems to work after all ??~~~~~~~~~~~
+# order of specifying CONTINUOUS covars as argument matters -> returns diff subgroups!  ~~~~~~~~~~ seems to work after all ??~~~~~~~~~~~
 # e.g. gamma = 3:
 #   diff subgroups for c("L1", "L2", "L3", "L4", "L5"), c("L3", "L1", "L2", "L4", "L5"), c("L2", "L3", "L1", "L4", "L5")
 #   also for L2, L3 (L8=1 & L6=1 & L7=1 is undetected) and L3, L2 (detected)
@@ -107,12 +104,12 @@ for (g in g_values) {
 }
 lst5_cat
 # gamma = 1: no critical subgroup
-# gamma = 2: one critical subgroup for alpha = 0.01, but v small
-# gamma = 3-10: detected for all alpha & beta = 0.1, except alpha = 0.01 & alpha = 0.02
+# gamma = 2: v small subgroups for a=0.01 only
+# gamma = 3-10: det for all a & b = 0.1, except a = 0.01/ 0.02 (there only with other L_i as replacement/additionally)
 # -> shows importance of categorising cont conf!! also computationally faster
-# -> weird that not for alpha = 0.01 as in uncategorised case.. so in case of categorisation,
-#     if a=0.01 (too small alpha) lets focus on small strata only?? but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation
-# problem of changing order in cov.quanti irrelevant here bc now all vars in cov.quali due to categorisation
+# -> weird that not det for a = 0.01, too,  as in uncategorised case.. 
+#    maybe bc if cat, then a=0.01 (too small a) lets focus on small strata only??
+#    but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation -> maybe randomness?
 
 
 
@@ -136,20 +133,20 @@ res5_plot <- kbsd(data = o5,
                                  A=0.5*sd(o5$A)))
 res5_plot
 # overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=0 could've indicated that there'll be less support for IV=2 (A=0)
 
 # what strata are those with low support for treated (IV = 1)
 subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
 table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
-# those with few support in IV=1 are L6=0 & L7=0 & L8=0, NOT L6=1 & L7=1 & L8=1 -> viol found
+# those with few support in IV=1 are L6=0 & L7=0 & L8=0, NOT L6=1 & L7=1 & L8=1 -> new viol found!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 table(o5[subset_5_1$observation, c("L9", "L10")])
 # many from L9=1 & L10=0 that have low support in IV=1
 
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
-o5[subset_5_2$observation, ]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
-# bottomline: PoRT directly returns strata (can check if sensible in context > don't need to know viol in advance),
+# bottomline: PoRT directly returns strata (can check if sensible in context -> don't need to know viol in advance),
 #             for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
 
 

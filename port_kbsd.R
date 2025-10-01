@@ -461,6 +461,21 @@ table(obs3[obs3$L2 == 1 & obs3$L3 == 1,"A"])
 obs3 %>% filter(L1==1 & L2==1 & L3==1 & A==1) %>% nrow()/
   obs3 %>% filter(L1==1 & L2==1 & L3==1) %>% nrow()  # expected viol #4: P(A=1)~1 for beta = 0.05/0.1
 
+# (OLD!! bc only intersections with all 3, not with 2 as well) table to check for binary conf where P(A) extreme
+make_strata_table <- function(dat, A = "A", binary_vars){
+  dat %>%
+    group_by(across(all_of(binary_vars))) %>%
+    summarise(
+      n      = n(),
+      n_treat = sum(.data[[A]] == 1),
+      n_control = sum(.data[[A]] == 0),
+      proba_exp= mean(.data[[A]] == 1), .groups = "drop",
+      sample_prop = n()/nrow(dat)) %>%
+    arrange(proba_exp)
+}
+binary_vars <- paste0("L", 1:3)
+print(make_strata_table(obs3, A = "A", binary_vars = binary_vars), n = 8)  # all =0 or all =1, both sample prop large enough 
+
 
 
 # PoRT ---

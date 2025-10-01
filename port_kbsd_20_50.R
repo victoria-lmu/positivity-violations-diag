@@ -24,26 +24,26 @@ DAG2 <- DAG.empty() +
   node("L19", distr = "rbern", prob = 0.5) +
   node("L20", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(L1 - L2 + L5*L19*L20))
-# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)=211/227=0.93 (pos viol for b=0.1)
+# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~1
 DAG2 <- set.DAG(DAG2)
 dat2 <- sim(DAG2, rndseed = 12082025, n = 1000)[-1]
 table(dat2$A)  # good that not too imbalanced
 dat2 %>% filter(L19==1 & L20 == 1 & A==1) %>% nrow()/
-  dat2 %>% filter(L19==1 & L20 == 1) %>% nrow()  # expect to be detected for b=0.1 from g=2 for any a (sample prop= 22.7%)
+  dat2 %>% filter(L19==1 & L20 == 1) %>% nrow()  # expect to be detected for g>=2, b=0.1, any a (sample prop= 22.7%)
 
 
-
-source('data/port_utils.R')
 
 ## PoRT: continuous vars uncategorised ----
+source('data/port_utils.R')
 gruber <- 5/(sqrt(nrow(dat2))*log(nrow(dat2)))
 port("A", cov.quanti = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
      cov.quali = c("L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
-     data = dat2, alpha = 0.05, beta = 0.1, gamma = 3)
-# gamma = 2: always b = 0.1, undetected: a=0.01/0.02/gruber/0.05 (too small alpha lets algo focus on smaller strata?), det: a=0.1, 0.04, 0.03
-# gamma = 3: same as gamma =2
+     data = dat2, alpha = 0.01, beta = 0.1, gamma = 3)
+# no longer work with a=0.02/0.03/0.04!
+# but g=3: undet for a=0.01/0.025/0.05, det for a= 0.1
+# (g= 2,3: undet for all b = 0.1 & a=0.01/0.02/gruber/0.05 (too small alpha lets algo focus on smaller strata?), det: a=0.1, 0.04, 0.03)
 
-a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
+a_values <- c(0.01, 0.025, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
 g_values <- 1:20
 lst20 <- list()
@@ -74,11 +74,11 @@ dat2_cat
 port("A", cov.quanti = NULL,
      cov.quali = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
                    "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
-     data = dat2_cat, alpha = 0.1, beta = 0.1, gamma = 3)
-# gamma = 2: detected for all with beta = 0.1 except with a = 0.01 (too small -> as above, but alr better with categorisation)
-# gamma = 3: same as gamma=2 
+     data = dat2_cat, alpha = 0.01, beta = 0.1, gamma = 3)
+# g = 3: undet for a=0.01, det for a=0.025/0.05/0.1 -> alr shows that cateogrisation better (det more often)
+# (g= 2,3: det for all with b = 0.1 except with a = 0.01 (too small -> as above, but alr better with cat))
 
-a_values <- c(0.01, 0.02, 0.03, 0.04, 0.05, 0.1)
+a_values <- c(0.01, 0.025, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
 lst20_cat <- list()
 for (g in g_values) {
@@ -95,7 +95,7 @@ for (g in g_values) {
 }
 lst20_cat
 # sink("port_20_cat.txt")
-# print(lst20_cat)  # rename to lst20
+# print(lst20_cat)
 # sink()
 
 

@@ -1,4 +1,5 @@
 library(simcausal)
 library(rpart)
+library(purrr)
 library(tidyverse)
 theme_set(theme_minimal())

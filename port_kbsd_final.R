@@ -16,13 +16,42 @@ plotDAG(dag2)
 obs2 <- sim(dag2, rndseed = 30072025, n = 1000)
 table(obs2$A)  # balanced
 
+# check manually for cont conf
 obs2 %>% filter(L1 > 60 & A==1) %>% nrow()/obs2 %>% filter(L1 > 60) %>% nrow()  # viol #1: for beta=0.1
+obs2 %>% filter(L1 < 60 & A==1) %>% nrow()/obs2 %>% filter(L1 < 60) %>% nrow()
 
-obs2 %>% filter(L2 == 0 & A==1) %>% nrow()/obs2 %>% filter(L2 ==0) %>% nrow()  # viol #2: for beta=0.05,0.1
+obs2 %>% filter(L2 == 0 & A==1) %>% nrow()/obs2 %>% filter(L2 ==0) %>% nrow()  # viol #2: for beta=0.05/0.1
 obs2 %>% filter(L1 > 60 & L2 == 0 & A==1) %>% nrow()/obs2 %>% filter(L1 > 60 & L2 ==0) %>% nrow()  # viol #3: combo of the 2 above with beta = 0.01!
 
 obs2 %>% filter(L2 == 1 & A==1) %>% nrow()/obs2 %>% filter(L2 ==1) %>% nrow()  # viol #4: for beta=0.1
 
+# check via table for all combos of binary conf if there are any with extreme P(A)
+make_strata_table <- function(dat, A = "A", binary_vars){
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
+}
+tab <- make_strata_table(obs2, A = "A", binary_vars = "L2")
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)
+# confirms viol 2+4 & sample prop large enough
 
 # PoRT ---
 source('data/port_utils.R')
@@ -105,7 +134,7 @@ plot(l_values2, diag_values2$diagnostic)
 # usually treated so that if intervene on A=0 for them, few unfit obs in neighbourhood
 
 
-# 3 Confounders Version 1 ----
+# 3 Confounders ----
 set.seed(15082025)
 sem3 <- DAG.empty() +
   node("L1", distr = "rbern", prob = 0.3) +
@@ -117,32 +146,38 @@ plotDAG(dag3)
 obs3 <- sim(dag3, rndseed = 12082025, n = 1000)
 table(obs3$A)  
 
-# check through all strata
-# gamma = 1
-table(obs3$L1, obs3$A)/rowSums(table(obs3$L1, obs3$A))
-table(obs3$L2, obs3$A)/rowSums(table(obs3$L2, obs3$A))
-table(obs3$L3, obs3$A)/rowSums(table(obs3$L3, obs3$A))  # low P(A=1|L3=0) -> viol #1 for b=0.1 (sample large enough with 386/1000)
-# gamma =2
-table(obs3[obs3$L1 == 0 & obs3$L2 == 0,"A"])
-table(obs3[obs3$L1 == 0 & obs3$L3 == 0,"A"])  # expected viol #2: P(A=1)~0 for b=gruber (sample large enough with 27.8%)
-table(obs3[obs3$L2 == 0 & obs3$L3 == 0,"A"])  # expected viol #3: P(A=1)~0 for b=0.1 (sample large enough with 34.6%)
-
-table(obs3[obs3$L1 == 0 & obs3$L2 == 1,"A"])
-table(obs3[obs3$L1 == 1 & obs3$L2 == 0,"A"])
-
-table(obs3[obs3$L1 == 0 & obs3$L3 == 1,"A"])
-table(obs3[obs3$L1 == 1 & obs3$L3 == 0,"A"])
-
-table(obs3[obs3$L2 == 0 & obs3$L3 == 1,"A"])
-table(obs3[obs3$L2 == 1 & obs3$L3 == 0,"A"])
-
-table(obs3[obs3$L1 == 1 & obs3$L2 == 1,"A"])
-table(obs3[obs3$L1 == 1 & obs3$L3 == 1,"A"])
-table(obs3[obs3$L2 == 1 & obs3$L3 == 1,"A"])
-# gamma = 3
-obs3 %>% filter(L1==1 & L2==1 & L3==1 & A==1) %>% nrow()/
-  obs3 %>% filter(L1==1 & L2==1 & L3==1) %>% nrow()  # expected viol #4: P(A=1)~1 for beta = 0.05/0.1
-
+# table to check for all combos of binary conf if there are any with extreme P(A)
+make_strata_table <- function(dat, A = "A", binary_vars){
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
+}
+binary_vars <- paste0("L", 1:3)
+tab <- make_strata_table(obs3, A = "A", binary_vars = binary_vars)
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)
+# g=1: low P(A=1|L3=0) -> viol #1 for b=0.1 (sample large enough with 38.6%)
+# g=2: L1=0 & L2=0 -> viol #2: P(A=1)~0 for b=gruber (sample large enough with 27.8%)
+#      L2=0 & L3=0 -> viol #3: P(A=1)~0 for b=0.1 (sample large enough with 34.6%)
+# g=3: L1=1 & L2=1 & L3=1 -> viol #4: P(A=1)~1 for a=0.01 & b=0.1
+#      L1=0 & L2=0 & L3=0 -> viol #5: for any a & b
 
 
 # PoRT ---
@@ -169,12 +204,11 @@ lst3
 # BEST COMBO: any alpha, b = 0.05 to find all 3 viol (beta=gruber/0.1 only find 1 critical subgroup each)
 # gamma = 3:
 # for a=0.01, viol #4 with L1==1 & L2==1 & L3==1 -> P(A=1)~1 should have been found
-# but instead, its complement with L1=0&L2=0&L3=0 -> P(A=1)~0 was found for b=0.01!
+# but instead, its complement with L1=0&L2=0&L3=0 as pred by make_strata_table -> viol #5 found for b=0.01!
 # reason: only for tree with split by 3 vars, a stratum with such an extreme beta could be found
 #         proba.exposure not extreme enough for split by 1 var/by 2 vars, so continued to build tree
 
 # essence: all violations except #4 were found, but #4 was found indirectly (L3=0 & L1=0 & L2=0) -> check if really so scarce
-obs3 %>% filter(L3==0 & L1==0 & L2==0 & A==1) %>% nrow()/obs3 %>% filter(L3==0 & L1==0 & L2==0) %>% nrow() # it is
 
 
 # KBSD ---
@@ -233,7 +267,7 @@ IQR(o3$A)  # using IQR would be suitable here, treatment distr not as imbalanced
 
 
 
-# 3 Confounders Version 2 ----
+# 3 Confounders With Middle-Gap ----
 
 # concatenate L1 + L2, so that low density in centre (bimodal distr) 
 # → adjust A accordingly (sides with higher P(A), centre with lower P(A))
@@ -294,6 +328,36 @@ data1 %>% filter(L3 >= 4 & L3 <= 6 & L1==0 & A==1) %>% nrow()/
 
 data1 %>% filter(L3 >= 4 & L3 <= 6 & L2==0 & A==1) %>% nrow()/
   data1 %>% filter(L3 >= 4 & L3 <= 6 & L2 == 0) %>% nrow()  # viol #3 (subviol of #1): if L3 in [4,6] AND L2=0, sample prop = 11.3% -> g>=2, b=0.1
+
+
+# table to check for all combos of binary conf if there are any with extreme P(A)
+make_strata_table <- function(dat, A = "A", binary_vars){
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
+}
+binary_vars <- paste0("L", c(1,2))
+tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
+tab
+# no extreme proba only with L1, L2
 
 
 # distr of A within L1 and L2 is not too extreme
@@ -406,7 +470,7 @@ plot(l_values2, diag_values2$diagnostic)
 
 
 
-# 5 Confounders ----
+# 5 Confounders With Middle-Gap ----
 
 set.seed(28092025)
 L3_1 <- rnorm(500, 3, 1)
@@ -428,8 +492,7 @@ data1 <- sim(dag1, n = 1000)
 
 plot(density(data1$L3), main = "bimodal L3 distribution from mixture") # again expect viol in [4,6]
 
-# never any extreme P(A) for L1, L2, L4, L5 and their intersections, but for when L3 is involved:
-
+# check for extreme probs with cont conf L3:
 data1 %>% filter(L3 >= 4 & L3 <= 6 & A==1) %>% nrow()/
   data1 %>% filter(L3 >= 4 & L3 <= 6) %>% nrow()  # viol #1: if L3 in [4,6], sample prop = 15.2% -> should find for g>=1, b=0.1
 
@@ -438,6 +501,36 @@ data1 %>% filter(L3 >= 4 & L3 <= 6 & L1==0 & A==1) %>% nrow()/
 
 data1 %>% filter(L3 >= 4 & L3 <= 6 & L2==0 & A==1) %>% nrow()/
   data1 %>% filter(L3 >= 4 & L3 <= 6 & L2 == 0) %>% nrow()  # viol #3 (subviol of #1): if L3 in [4,6] AND L2=0, sample prop = 11.9% -> g>=2, b=0.1
+
+# check via table for extreme probs for all combos of binary conf:
+make_strata_table <- function(dat, A = "A", binary_vars){
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
+}
+binary_vars <- paste0("L", c(1,2,4,5))
+tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
+tab %>% print(n=80)
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)
+# no extreme proba with only binary L_i expected (strata with p=0/1 are too small)
 
 ## PoRT: continuous var L3 uncategorised ----
 source("data/port_utils.R")
@@ -531,6 +624,10 @@ data1 %>% filter(L3 < 6 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow()
 
 
 # 10 Confounders ----
+# see file port_kbsd_10.R
+
+
+# 10 Confounders With Middle-Gap ----
 
 set.seed(29092025)
 L3_1 <- rnorm(500, 3, 1)
@@ -555,14 +652,44 @@ dag1 <- set.DAG(sem1)
 plotDAG(dag1)
 data1 <- sim(dag1, n = 1000)
 
-data1 %>% filter(L3> 4 & L3 <6 & A==1) %>% nrow()/data1 %>% filter(L3 <6) %>% nrow()  # viol for g>=1, b>=0.05, sample prop =57.4%
+data1 %>% filter(L3> 5 &L3 < 6 & A==1) %>% nrow()/
+  data1 %>% filter(L3> 5 &L3 < 6) %>% nrow()  # viol P(A=1)~0 for g>=1, a<=0.05, b=0.1, sample prop =8.3%, maybe esp if all other L_i=0!
 
+# table to check for all combos of binary conf if there are any with extreme P(A)
+make_strata_table <- function(dat, A = "A", binary_vars){
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
+}
+
+binary_vars <- paste0("L", c(1,2,4:10))
+tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>% print(n=64)
+# multiple viol, but all with v small alpha values -> will only be detected for a=0.01 & prob not v relevant pos viol
 
 ## PoRT: continuous var L3 uncategorised ----
 source("data/port_utils.R")
 lst5 <- list()
 a_values <- c(0.01, 0.025, 0.05, 0.1)
-b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(data1))), 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(data1))*log(nrow(data1))), 0.05, 0.1)
 g_values <- 1:10
 for (g in g_values) {
   for (a in a_values) {
@@ -575,29 +702,38 @@ for (g in g_values) {
   }
 }
 lst5
-# gamma = 1:
-# gamma = 2-10: 
+#sink("port_10_bimodal_uncat.txt")
+# gamma = 1: found as small stratum [5,6]
+# gamma = 2-10: for a = 0.1, b = 0.1 viol is found with broader [3.5,6] but with combo of L2=0
+# [5,6] always found for a<0.1, b=0.1 as should & smaller a=0.01/0.025 lead to many other splits of L3 bc cont conf
+# a = 0.05/0.1 & b=0.05/0.1 usually most reliable & concise as recommended by lit
 
 
 ## PoRT: continuous var L3 categorised ----
 data1_cat <- data1
 source("data/port_utils.R")
-data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 4, 6, 8, Inf))
+data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 3, 4, 5, 6, 7, 8, Inf))
 lst5_cat <- list()
 for (g in g_values) {
   for (a in a_values) {
     for (b in b_values) {
       lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
         port(A = "A", cov.quanti = NULL,
-             cov.quali = c("L1", "L2", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
-             data = data1, alpha = a, beta = b, gamma = g)
+             cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1_cat, alpha = a, beta = b, gamma = g)
     }
   }
 }
 lst5_cat
-# gamma = 1:
-# gamma = 2: 
-# gamma = 3-10:
+#sink("port_10_bimodal_cat.txt")
+# gamma = 1: viol always found for b=0.1 as should
+# gamma = 2: viol found for b=0.1, also some other "random/rather irrelevant viol" for a=0.01
+# gamma >= 4: found the viol also for a=0.1, b=0.1 in combo with other L_i = 0 (largest 3 viol strata)
+# gamma =5: same as g=4 AND found the viol also for a=0.05 in combo with other L_i = 0
+# gamma >=5: found the viol also for a=0.05 in combo with other L_i = 0 (more other L_i the higher gamma!)
+# gamma = 7: a=0.05, b=0.05: interesting that second viol being an intersection of 6 vars only det now & not for g=6 alr
+# gamma = 8-10: a=0.05, b=0.05: same as g=7 & third viol being an is of 7 vars not for 7 alr
+# [5,6] always found for a<0.1, b=0.1 as should
 
 
 # KBSD ---
@@ -624,22 +760,29 @@ res5_plot  # again fewer support for IV=1 & NB: lower EDP overall bc more dims <
 table(data1$A)  # which alr indicated here by fewer obs in A=1
 
 
-# acc to viol, few support for IV=1 (A=1) if would estimate Y|A=1 further, for subgroup L3=(4,6]:
+# acc to viol, few support for IV=1 (A=1) if would estimate Y|A=1 further, bc P(A=1)~0 for subgroup L3=(5,6]:
 shift1 <- res5[res5$shift == 1,]
 outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]  # to which original obs (L values) do these outliers belong?
-diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
-plot(l_values1, diag_values1$diagnostic)
-# now clearer that L3 around 5 have fewer EDP than surrounding values! so problem of dimensionality or random?
-# shows that if we intervened all on A=1, those with L3 around 5 have fewer support which reflects
-# that there just don't exist many obs with L3~5 & A=1
+for (i in names(o5)[-11]) {
+  l_values1 <- data1[outliers1, i]
+  diag_values1 <- shift1[outliers1,]
+  plot(l_values1, diag_values1$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
+}
+# visible that L3 has fewer EDP overall around 5: shows that if we intervened all on A=1,
+# those with L3 around 5 have fewer support which reflects that there just don't exist many obs with L3~5 & A=1
+# no clear trend for any other confounder -> also didn't expect any viol for P(A=1)
 
-# also check for IV=2 (A=0)
+# no viol for IV=2 (A=0) expected
 shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.05)  # create indices for the "outliers"
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
 l_values2 <- data1[outliers2, "L3"]  # original L3 values
 diag_values2 <- shift1[outliers2,] # diag values
 plot(l_values2, diag_values2$diagnostic)
+
+# essence/interesting: shape of L3 distr for higher quantiles -> makes sense bc 
+# the more in center, the higher the support (more EDP) -> except between 4-6 can see that rarer
+# also, overall v low EDP due to high dim, so try alternative EDP formulas below
+
 
 ### formula for EDP for high-dim covar set ----
 
@@ -667,3 +810,8 @@ res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmea
                                L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                                A=0.5*sd(o5$A)), plot.out = F)
 
+
+
+# 20 Confounders ----
+
+# see file port_kbsd_20_50.R
