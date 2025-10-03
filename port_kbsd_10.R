@@ -17,32 +17,43 @@ DAG <- DAG.empty() +
   node("L8", distr = "rbern", prob = 0.5) +
   node("L9", distr = "rbern", prob = 0.5) +
   node("L10", distr = "rbern", prob = 0.5) +
-  node("A", distr = "rbern", prob = plogis(2*L6*L7*L8))  # A only depends on these conf;
+  node("A", distr = "rbern", prob = plogis(3*L6*L7*L8))  # A only depends on these conf;
 # if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.88
 DAG <- DAG 
 DAG <- set.DAG(DAG)
 dat <- sim(DAG, n = 1000)
 table(dat$A)  # balanced
 
-# table to check for extreme treatment probs only for binary conf: results in table of dimension 2^5
+# table to check for all combos of binary conf if there are any with extreme P(A)
 make_strata_table <- function(dat, A = "A", binary_vars){
-  dat %>%
-    group_by(across(all_of(binary_vars))) %>%
-    summarise(
-      n      = n(),
-      n_treat = sum(.data[[A]] == 1),
-      n_control = sum(.data[[A]] == 0),
-      proba_exp= mean(.data[[A]] == 1), .groups = "drop",
-      sample_prop = n()/nrow(dat)) %>%
-    arrange(proba_exp)
+  
+  # create all combos of binary_vars of length >= 1
+  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
+                    recursive = FALSE)
+  
+  # summary stats for each combo
+  results <- map(subsets, function(vars) {
+    dat %>%
+      group_by(across(all_of(vars))) %>%
+      summarise(n          = n(),
+                n_treat    = sum(.data[[A]] == 1),
+                n_control  = sum(.data[[A]] == 0),
+                proba_exp  = mean(.data[[A]] == 1),
+                sample_prop = n()/nrow(dat),
+                .groups = "drop") %>%
+      mutate(vars = paste(vars, collapse = ","))
+  })
+  
+  # bind all results together
+  bind_rows(results) %>%
+    arrange(vars, proba_exp)
 }
 binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
-print(make_strata_table(dat, A = "A", binary_vars = binary_vars), n = 32)
-# as wanted: all violating subgroups have L8=1 & L6=1 & L7=1, optionally L9=0 & 
-#      sample large enough if with L9&L10 alr 3% (NB: overall only have extremely HIGH proba_exp, not extr LOW)
-# in fact, sample prop of L8=1 & L6=1 & L7=1: 13.6%, proba_exp = 123/136 = 0.904 i.e. to detect with any a & b = 0.1
-dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
-  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)
+tab %>% filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)
+# as wanted: only viol stratum is L8=1 & L6=1 & L7=1, optionally L9 & L10
+# sample prop of L8=1 & L6=1 & L7=1: 13.6%, proba_exp = 130/136 = 0.956 i.e. to detect with any a & b = 0.05/0.1
+
 
 
 ## PoRT: continuous vars uncategorised ----
@@ -50,7 +61,7 @@ source("data/port_utils.R")
 lst5 <- list()
 a_values <- c(0.01, 0.025, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
-g_values <- 1:10
+g_values <- 1:5
 for (g in g_values) {
   for (a in a_values) {
     for (b in b_values) {
@@ -61,26 +72,13 @@ for (g in g_values) {
   }
 }
 lst5
-# sink("port_10_uncat.txt")
-# print(lst5)
-# sink()
+#sink("port_10_uncat.txt")
 # gamma = 1,2: irrelevant for defined critical stratum bc not yet poss to cover as intersection of 3
-#  -> so other viol among cont conf, but only for alpha=0.01/0.02 (v small, prob meaningless viol)
+#  -> so other viol among cont conf, but only for a=0.01 (g=1) and a=0.01/0.02 (g=2) -> v small, prob meaningless viol
 #  -> the smaller you allow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
-# gamma = 3-10: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
-#  -> included for a=0.01/0.05/0.1 (& beta=0.1), BUT never for a=0.02/0.03/0.04 (& beta=0.1)
-
-
-port("A", cov.quali = c("L7", "L8", "L9", "L6", "L10"),
-     cov.quanti = c( "L2", "L1", "L3", "L4"), data = dat, alpha = 0.01, beta = 0.1, gamma = 4)
-# order of specifying CONTINUOUS covars as argument matters -> returns diff subgroups!  ~~~~~~~~~~ seems to work after all ??~~~~~~~~~~~
-# e.g. gamma = 3:
-#   diff subgroups for c("L1", "L2", "L3", "L4", "L5"), c("L3", "L1", "L2", "L4", "L5"), c("L2", "L3", "L1", "L4", "L5")
-#   also for L2, L3 (L8=1 & L6=1 & L7=1 is undetected) and L3, L2 (detected)
-# e.g. gamma = 4:
-#   undetected if order in continuous vars is L2, L1 -> detected if order is L1, L2
-#   same for L2, L3 (undetected) and L3, L2 (detected)
-# how is this possible?
+# gamma = 3-5: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
+# -> included for a = 0.01/0.01/0.1 & b=0.1, not det for a = 0.025 & b=0.1
+# -> included for a = 0.05/0.1 & b=0.05, not det for a=0.01/0.025 & b=0.05
 
 
 ## PoRT: continuous vars categorised ----
@@ -103,14 +101,15 @@ for (g in g_values) {
   }
 }
 lst5_cat
+#sink("port_10_cat.txt")
 # gamma = 1: no critical subgroup
 # gamma = 2: v small subgroups for a=0.01 only
-# gamma = 3-10: det for all a & b = 0.1, except a = 0.01/ 0.02 (there only with other L_i as replacement/additionally)
-# -> shows importance of categorising cont conf!! also computationally faster
-# -> weird that not det for a = 0.01, too,  as in uncategorised case.. 
+# g= 3-5: det for a = 0.025/0.05/0.1 & b=0.1 & undet for a = 0.01, b = 0.1  -> weird that not det for a = 0.01
 #    maybe bc if cat, then a=0.01 (too small a) lets focus on small strata only??
 #    but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation -> maybe randomness?
-
+#         det for all a & b=0.05 tho -> so weird, bc b=0.1 allows for more, hypothesis here:
+# it's as if PoRT only recognises as viol if the violating gorups proba_exposure is close to b/1-b
+# alr more detected which shows importance of cat cont conf!! also computationally faster
 
 
 ## KBSD ----
@@ -138,7 +137,7 @@ table(o5$A)  # a few less obs for A=0 could've indicated that there'll be less s
 # what strata are those with low support for treated (IV = 1)
 subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
 table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
-# those with few support in IV=1 are L6=0 & L7=0 & L8=0, NOT L6=1 & L7=1 & L8=1 -> new viol found!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# those with few support in IV=1 are L6=0 & L7=0 & L8=0, NOT L6=1 & L7=1 & L8=1 -> new viol found!!!!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 table(o5[subset_5_1$observation, c("L9", "L10")])
 # many from L9=1 & L10=0 that have low support in IV=1
 

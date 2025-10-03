@@ -51,16 +51,19 @@ for (g in g_values) {
   for (a in a_values) {
     for (b in b_values) {
       lst20[[paste0("gamma = ", g, ", alpha = ", a, ", beta = ", b)]] <-
-        port(A = "A",cov.quanti = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-                                    "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
-             cov.quali = NULL, data = dat2, alpha = a, beta = b, gamma = g)
+        port(A = "A",cov.quanti = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             cov.quali = c("L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
+             data = dat2, alpha = a, beta = b, gamma = g)
     }
   }
 }
 lst20
-# sink("port_20_uncat.txt")
-# print(lst20)
-# sink()
+sink("port_20_uncat.txt")
+print(lst20)
+sink()
+# there exists port_20_uncat alr saved in output_port but wrongly used all vars as quanti so for the trash, don't mix up!
+# g = 1: only with other cont vars, but none for recommended a=0.05/0.1
+# g = 2: 
 
 
 ## PoRT: continuous vars categorised ----
@@ -80,6 +83,7 @@ port("A", cov.quanti = NULL,
 
 a_values <- c(0.01, 0.025, 0.05, 0.1)
 b_values <- c(0.01, 5/(sqrt(nrow(dat2))*log(nrow(dat2))), 0.05, 0.1)
+g_values <- 1:10
 lst20_cat <- list()
 for (g in g_values) {
   for (a in a_values) {
