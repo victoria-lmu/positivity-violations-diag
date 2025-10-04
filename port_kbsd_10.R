@@ -1,6 +1,6 @@
 source("setup.R")
 
-# 4) 10 Confounders ----
+# 10 Confounders ----
 
 set.seed(22092025)
 #  do not use for loop anymore: returned weird obs -> rnorm obs were all similar 
@@ -24,30 +24,7 @@ DAG <- set.DAG(DAG)
 dat <- sim(DAG, n = 1000)
 table(dat$A)  # balanced
 
-# table to check for all combos of binary conf if there are any with extreme P(A)
-make_strata_table <- function(dat, A = "A", binary_vars){
-  
-  # create all combos of binary_vars of length >= 1
-  subsets <- unlist(lapply(1:length(binary_vars), function(x) combn(binary_vars, x, simplify = FALSE)),
-                    recursive = FALSE)
-  
-  # summary stats for each combo
-  results <- map(subsets, function(vars) {
-    dat %>%
-      group_by(across(all_of(vars))) %>%
-      summarise(n          = n(),
-                n_treat    = sum(.data[[A]] == 1),
-                n_control  = sum(.data[[A]] == 0),
-                proba_exp  = mean(.data[[A]] == 1),
-                sample_prop = n()/nrow(dat),
-                .groups = "drop") %>%
-      mutate(vars = paste(vars, collapse = ","))
-  })
-  
-  # bind all results together
-  bind_rows(results) %>%
-    arrange(vars, proba_exp)
-}
+# table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
 binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
 tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)
 tab %>% filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)
@@ -145,9 +122,11 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
-# bottomline: PoRT directly returns strata (can check if sensible in context -> don't need to know viol in advance),
-#             for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
+# essence: PoRT directly returns strata (can check if sensible in context -> don't need to know viol in advance),
+#          for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
 
+
+### alternative values/metrics for disthalf vec ----
 
 # disthalf_vec: best case values, i.e. double values <=> kernel less steep
 res5_plot <- kbsd(data = o5,
@@ -170,7 +149,6 @@ res5_plot
 # over all disthalf_vec specifications: same general trend with better support for IV=1, but EDP values quite diff
 
 
-### alternative metrics for disthalf vec ----
 # prob similar results as for other metrics/plots
 mad(o5$A)  # mad unsuitable
 IQR(o5$A)  # IQR ok here, treatment distr not as imbalanced as in 2 Conf setting
@@ -206,13 +184,491 @@ res5_hm_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmon
                      L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                      A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
                      plot.out = T)
-ggsave("kbsd_10_hm.png", width = 6, height = 3)
+#ggsave("kbsd_10_hm.png", width = 6, height = 3)
+
+#### essence: same trend, but much higher discrepancy between EDP ranges of the two IV types: IV=1 is 20 EDPs higher than IV=2 ----
+
+
 res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
                      disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
                                     L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                                     A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
                      plot.out = F)
-sink("kbsd_10_hm.txt")
-print(res5_hm)
-sink()
+#sink("kbsd_10_hm.txt")
+
+
+
+# 10 Confounders Binary ----
+
+setwd("C:/Users/victo/OneDrive/Desktop/Uni/Statistik/BA_thesis/positivity-violations-diag")
+set.seed(03102025)
+DAG <- DAG.empty() +
+  node("L1", distr = "rbern", prob = 0.5) +
+  node("L2", distr = "rbern", prob = 0.5) +
+  node("L3", distr = "rbern", prob = 0.5) +
+  node("L4", distr = "rbern", prob = 0.5) +
+  node("L5", distr = "rbern", prob = 0.5) +
+  node("L6", distr = "rbern", prob = 0.5) +
+  node("L7", distr = "rbern", prob = 0.5) +
+  node("L8", distr = "rbern", prob = 0.5) +
+  node("L9", distr = "rbern", prob = 0.5) +
+  node("L10", distr = "rbern", prob = 0.5) +
+  node("A", distr = "rbern", prob = plogis(3*L6*L7*L8))  # A only depends on these conf;
+# if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.95
+
+DAG <- DAG 
+DAG <- set.DAG(DAG)
+dat <- sim(DAG, n = 1000)
+table(dat$A)  # balanced
+
+# table to check for all combos of binary conf if there are any with extreme P(A)
+binary_vars <- paste0("L", 1:10)
+tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)
+tab %>% 
+  filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>%
+  arrange(desc(sample_prop)) %>% print(n=830)
+# many viol with >5 covariates for stratum -> only interested in <= 5
+tab %>% 
+  filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>%
+  arrange(desc(sample_prop)) %>% print(n=830) %>% head(30) %>% print(n=50)
+# as wanted: L6=1 & L7=1 & L8=1 with P(A=1)= 0.921, sample prop = 14% -> should be det for b=0.1 & any a
+
+## PoRT ----
+source("data/port_utils.R")
+lst5 <- list()
+a_values <- c(0.01, 0.025, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
+g_values <- 1:5
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL,
+             cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"), data = dat, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5
+# sink("output_port/port_10_binary.txt")
+# g=1,2: no viol bc not yet inteserction of 3 poss
+# g=3: always det for any a & b=0.1
+# g=4: always det for any a & b=0.1, with additional L_i for any a & b=0.05
+# g=5: always det for any a & b=0.1, with additional L_i for small a <= 0.025 & b=0.05
+
+
+## KBSD ----
+source("kbsd.R")
+set.seed(03102025)
+o5 <- dat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)), plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+res5_plot  # again fewer support for IV=1 & NB: lower EDP range with 0-100 bc more dims <=> more diff for obs to be close
+table(dat$A)  # which alr indicated here by fewer obs in A=1
+
+
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
+# again, those with few support in IV=1 are L6=0 & L7=0 & L8=0 -> new viol found?
+# check prevalence in data:
+dat %>% filter(L6==0 &L7==0 &L8==0 & A==1) %>% nrow()/
+  dat %>% filter(L6==0 &L7==0 &L8==0) %>% nrow()  # not extreme tho so actually no viol
+table(o5[subset_5_1$observation, c("L9", "L10")])
+# many from L9=1 & L10=0 that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# essence: PoRT & kbsd detected viol -> binary case seems v agréable for both diags
+
+
+
+# 10 Confounders With Left-Side-Gap ----
+
+set.seed(04102025)
+L3_1 <- rnorm(100, 3, 1)
+L3_2 <- rnorm(900, 7, 1)
+L3_1_2 <- c(L3_1, L3_2)
+plot(density(L3_1_2))
+sem1 <- DAG.empty() +
+  node("L1", distr = "rbern", prob = 0.1) +
+  node("L2", distr = "rbern", prob = 0.2) +
+  node("L3", distr = "rconst", const = L3_1_2) +  # L3 follows a bimodal distribution with
+  #        gap in the middle (i.e. values around 5 are rare & will receive A=1 v rarely),
+  #        where vals around 5 have v low prob & vals to left & right have higher prob
+  node("L4", distr = "rbern", prob = 0.1) +
+  node("L5", distr = "rbern", prob = 0.2) +
+  node("L6", distr = "rbern", prob = 0.1) +
+  node("L7", distr = "rbern", prob = 0.2) +
+  node("L8", distr = "rbern", prob = 0.1) +
+  node("L9", distr = "rbern", prob = 0.2) +
+  node("L10", distr = "rbern", prob = 0.1) +
+  node("A", distr = "rbern", prob = plogis(0.2*L1 + 0.3*L2 + 0.1*L4 + 0.3*L5 - 2*L3*(L3 < 4)))
+# treatment for L3~5 is highly unlikely
+# all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
+dag1 <- set.DAG(sem1)
+plotDAG(dag1)
+data1 <- sim(dag1, n = 1000)
+table(data1$A)  # balanced
+
+data1 %>% filter(L3 < 4 & A==1) %>% nrow()/
+  data1 %>% filter(L3 < 4) %>% nrow()  # viol P(A=1)~0 for g>=1, b=0.1, a<=0.05 as sample prop =8.3%, maybe esp if all other L_i=0!
+
+# table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
+binary_vars <- paste0("L", c(1,2,4:10))
+tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>% print(n=64)
+# no viol with binary varsa bc not large enough sample prop that could be relevant
+
+## PoRT: continuous var L3 uncategorised ----
+source("data/port_utils.R")
+lst5 <- list()
+a_values <- c(0.01, 0.025, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(data1))*log(nrow(data1))), 0.05, 0.1)
+g_values <- 1:5
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = c("L3"),
+             cov.quali = c("L1", "L2", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5
+#sink("output_port/port_10_leftgap_uncat.txt")
+# same results for all g=1-5 as only viol for L3 expected: always det when should tho most precise for a=0.05 & b=gruber
+# over all g, if small a <= 0.025, many small strata of L3 bc cont confounder
+
+
+## PoRT: continuous var L3 categorised ----
+data1_cat <- data1
+source("data/port_utils.R")
+data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 3, 4, 5, 6, 7, 8, Inf))
+lst5_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL,
+             cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1_cat, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5_cat
+#sink("output_port/port_10_leftgap_cat.txt")
+# also same over all g=1-5, no viol ofr other binary conf as expected
+
+
+## KBSD ----
+source("kbsd.R")
+set.seed(04102025)
+o5 <- data1[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)), plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+res5_plot  # similar support, EDP range is 0-100
+table(data1$A)  # which alr by treatment level distribution
+
+# what strata are those with low support for treated (IV = 1)
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
+for (i in names(o5)[-11]) {
+  l_values1 <- data1[outliers1, i]
+  diag_values1 <- shift1[outliers1,]
+  plot(l_values1, diag_values1$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
+}  
+# no pattern for other binary vars expect that most have L_i=0 (makes sense bc simulated with low P(A=1))
+# for L3 can see that starting from L3<6 there is few support for IV=1 (A=1) -> clearer that from L3<4 for quantile 0.5!
+# -> as wanted: few obs from L3<4 with A=1 so few support if we intervene these obs on IV=1 (A=1!)
+
+# what strata are those with low support for treated (IV = 0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = .25)
+for (i in names(o5)[-11]) {
+  l_values2 <- data1[outliers2, i]
+  diag_values2 <- shift2[outliers2,]
+  plot(l_values2, diag_values2$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
+}
+# no real pattern: makes sense that support for A=0 is fine among L3<4 bc most in this stratum got A=0!
+# worse for quantile = 0.5 than for 0.25 bc just overall fewer obs with L3<4 (see sim with low density on left)
+
+# essence: PoRT det viol both in uncat & cat data, tho cat is nicer to interpret if precise enough as here
+#          kbsd also det viol stratum, tho detection dep on choice of EDP threshold (quantile)..
+
+
+
+# 10 Confounders With Middle-Gap ----
+
+set.seed(29092025)
+L3_1 <- rnorm(500, 3, 1)
+L3_2 <- rnorm(500, 7, 1)
+L3_1_2 <- c(L3_1, L3_2)
+plot(density(L3_1_2))
+sem1 <- DAG.empty() +
+  node("L1", distr = "rbern", prob = 0.1) +
+  node("L2", distr = "rbern", prob = 0.2) +
+  node("L3", distr = "rconst", const = L3_1_2) +  # L3 follows a bimodal distribution with
+  #        gap in the middle (i.e. values around 5 are rare & will receive A=1 v rarely),
+  #        where vals around 5 have v low prob & vals to left & right have higher prob
+  node("L4", distr = "rbern", prob = 0.1) +
+  node("L5", distr = "rbern", prob = 0.2) +
+  node("L6", distr = "rbern", prob = 0.1) +
+  node("L7", distr = "rbern", prob = 0.2) +
+  node("L8", distr = "rbern", prob = 0.1) +
+  node("L9", distr = "rbern", prob = 0.2) +
+  node("L10", distr = "rbern", prob = 0.1) +
+  node("A", distr = "rbern", prob = plogis(0.2*L1 + 0.3*L2 + 0.1*L4 + 0.3*L5 - 2*L3*(L3 > 4 & L3 < 6)))
+# treatment for L3~5 is highly unlikely
+# all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
+dag1 <- set.DAG(sem1)
+plotDAG(dag1)
+data1 <- sim(dag1, n = 1000)
+
+data1 %>% filter(L3> 4 &L3 < 6 & A==1) %>% nrow()/
+  data1 %>% filter(L3> 4 &L3 < 6) %>% nrow()  # viol P(A=1)~0 for g>=1, any b, any a bc sample prop = 16%, maybe esp if all other L_i=0!
+
+# table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
+binary_vars <- paste0("L", c(1,2,4:10))
+tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
+tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>% print(n=64)
+# all viol with binary conf only with v small a values -> will only be detected for a=0.01 & prob not v relevant pos viol
+
+## PoRT: continuous var L3 uncategorised ----
+source("data/port_utils.R")
+lst5 <- list()
+a_values <- c(0.01, 0.025, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(data1))*log(nrow(data1))), 0.05, 0.1)
+g_values <- 1:5
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = c("L3"),
+             cov.quali = c("L1", "L2", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5
+#sink("port_10_bimodal_uncat.txt")
+# gamma = 1-5: always found for all a & b
+
+
+## PoRT: continuous var L3 categorised ----
+data1_cat <- data1
+source("data/port_utils.R")
+data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 3, 4, 5, 6, 7, 8, Inf))
+lst5_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL,
+             cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1_cat, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5_cat
+#sink("port_10_bimodal_cat.txt")
+# gamma = 1-5: also always found for all a & b, as stratum [4,5], [5,6]
+
+
+## KBSD ----
+source("kbsd.R")
+set.seed(20092025)
+o5 <- data1[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)), plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+res5_plot  # fewer support for IV=1 & NB: lower EDP range with 0-100 bc more dims <=> more diff for obs to be close
+table(data1$A)  # which alr indicated here by fewer obs in A=1
+
+
+# acc to viol, few support for IV=1 (A=1) if would estimate Y|A=1 further, bc P(A=1)~0 for subgroup L3=(5,6]:
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
+for (i in names(o5)[-11]) {
+  l_values1 <- data1[outliers1, i]
+  diag_values1 <- shift1[outliers1,]
+  plot(l_values1, diag_values1$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
+}
+# for quantile = 0.05: visible that overall, L3 has fewer obs around 5: shows that if we intervened all on A=1,
+# those with L3 around 5 have fewer support which reflects that there just don't exist many obs with L3~5 & A=1 (even more visible for quantile = 0.25)
+# no clear trend for any other confounder -> also didn't expect any viol for P(A=1)
+
+# no viol for IV=2 (A=0) expected
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.05)
+l_values2 <- data1[outliers2, "L3"]  # original L3 values
+diag_values2 <- shift1[outliers2,] # diag values
+plot(l_values2, diag_values2$diagnostic)  # no low EDP for L3~5 at all, bc all with L3~5 got A=0 so there is lots of support for IV=2 (A=0)
+
+# the more in center, the higher the support, except between 4-6 rarer
+# also, overall v low EDP due to high dim, so try alternative EDP formulas below
+
+
+
+# 10 Confounders Correlated ----
+
+setwd("C:/Users/victo/OneDrive/Desktop/Uni/Statistik/BA_thesis/positivity-violations-diag")
+set.seed(03102025)
+DAG <- DAG.empty() +
+  node("L1", distr = "rnorm", mean = 1, sd = 1) +
+  node("L2", distr = "rnorm", mean = 2, sd = 1) +
+  node("L3", distr = "rnorm", mean = 3, sd = 1) +
+  node("L4", distr = "rnorm", mean = 4, sd = 1) +
+  node("L5", distr = "rnorm", mean = 5, sd = 1) +
+  node("L6", distr = "rbern", prob = 0.5) +
+  node("L7", distr = "rbern", prob = 0.5) +
+  node("L8", distr = "rbern", prob = 0.5) +
+  node("L9", distr = "rbern", prob = 0.5) +
+  node("L10", distr = "rbern", prob = 0.5) +
+  node("A", distr = "rbern", prob = plogis(3*L6*L7*L8)) 
+# if one of these 3 conf =0, then P(A)=0.5; if all =1, then P(A)=0.95
+DAG <- DAG 
+DAG <- set.DAG(DAG)
+dat <- sim(DAG, n = 1000)
+table(dat$A)  # balanced
+hist(dat$L2)
+
+cor(dat) > 0.3  # rn no real correlation between L_i -> induce artificially:
+dat$L2 <- 2*dat$L1 + rnorm(1000,0,1)
+cor(dat$L2, dat$L1)  # cor of 0.88
+hist(dat$L2)
+dat$L10 <- dat$L9
+cor(dat$L10, dat$L9)  # cor of 1   - but corr does not involve vars of viol.. stupid?~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# table to check for all combos of binary conf if there are any with extreme P(A)
+binary_vars <- paste0("L", 6:10)
+tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)  # function defined in setup.R
+tab %>% filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)  # defo L6=1 & L7=1 & L8=1 as viol
+dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # should be det for any b, any a as sample prop = 11.7%
+
+
+## PoRT: continuous vars uncategorised ----
+source("data/port_utils.R")
+lst5 <- list()
+a_values <- c(0.01, 0.025, 0.05, 0.1)
+b_values <- c(0.01, 5/(sqrt(nrow(dat))*log(nrow(dat))), 0.05, 0.1)
+g_values <- 1:5
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = c("L1", "L2", "L3", "L4", "L5"),
+             cov.quali = c("L6", "L7", "L8", "L9", "L10"), data = dat, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5
+#sink("port_10_corr_uncat.txt")
+# g = 1, 2: not yet poss to det
+# g=3-5: only det from a=0.01 & b=0.1 (but should for any b!) -> suspicion from 10 Cf 
+#  normal does not hold anymomre .> just random that PoRT misses for certain values then?
+
+
+
+## PoRT: continuous vars categorised ----
+data1_cat <- data1
+source("data/port_utils.R")
+data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 3, 4, 5, 6, 7, 8, Inf))
+lst5_cat <- list()
+for (g in g_values) {
+  for (a in a_values) {
+    for (b in b_values) {
+      lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
+        port(A = "A", cov.quanti = NULL,
+             cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
+             data = data1_cat, alpha = a, beta = b, gamma = g)
+    }
+  }
+}
+lst5_cat
+#sink("port_10_bimodal_cat.txt")
+# g=1,2: not poss yset to det
+# g = 3-5: only det from a = 0.025 & b=0.01/gruber, again from a = 0.05 & any b
+
+# essence: PoRT det safely for larger a & b but weird that not alr earlier!
+
+
+## KBSD ----
+source("kbsd.R")
+o5 <- dat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 A=0.5*sd(o5$A)))
+res5_plot
+# overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=0 could've indicated that there'll be less support for IV=2 (A=0)
+
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < quantile(res5[res5$shift == 1, "diagnostic"], 0.25) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L6", "L7", "L8")]) # no real pattern -> also did not expect viol here
+table(o5[subset_5_1$observation, c("L9", "L10")])
+# many from L9=0 & L10=0 or 1&1 that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_5_2 <- res5[res5$diagnostic < quantile(res5[res5$shift == 2, "diagnostic"], 0.25) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# essence: both diags det viol, although PoRT fails for smaller a, b values
+
 
