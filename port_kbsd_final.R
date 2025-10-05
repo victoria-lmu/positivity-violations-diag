@@ -212,6 +212,7 @@ table(subset_3[, c("L1", "L2")]) # most are indeed from L1=1 & L2=1
 
 # essence: both viol det by PoRT & kbsd, but for PoRT uncat the critical strata were
 #          not flagged for smaller a, so again suspicion with smaller a meaning PoRT only focuese on small strata
+#          ! only consider viol #2 tho bc only that one also poss in correlated scenario!
 
 
 
