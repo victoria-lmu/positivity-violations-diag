@@ -412,7 +412,7 @@ for (i in names(o5)[-11]) {
 # for L3 can see that starting from L3<6 there is few support for IV=1 (A=1) -> clearer that from L3<4 for quantile 0.5!
 # -> as wanted: few obs from L3<4 with A=1 so few support if we intervene these obs on IV=1 (A=1!)
 
-# what strata are those with low support for treated (IV = 0)
+# what strata are those with low support for untreated (IV = 0)
 shift2 <- res5[res5$shift == 2,]
 outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = .25)
 for (i in names(o5)[-11]) {

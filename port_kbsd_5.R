@@ -542,7 +542,7 @@ data1 %>% filter(L3 < 6& A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # 
 
 # essence: both PoRT & kbsd det viol & for PoRT, the induced correlation here between the other vars 
 # not involved in viol did not impact detection (as it did in 10 Conf scenario, but then again
-# in 10 Conf scenario the problem with nondetection alr existed for uncorr setting so rather dimensionality problem?
+# in 10 Conf scenario the problem with nondetection alr existed for uncorr setting so rather dimensionality problem?)
 
 
 
