@@ -18,7 +18,7 @@ DAG <- DAG.empty() +
   node("L9", distr = "rbern", prob = 0.5) +
   node("L10", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(3*L6*L7*L8))  # A only depends on these conf;
-# if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.88
+# if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.95
 DAG <- DAG 
 DAG <- set.DAG(DAG)
 dat <- sim(DAG, n = 1000)
@@ -54,7 +54,7 @@ lst5
 #  -> so other viol among cont conf, but only for a=0.01 (g=1) and a=0.01/0.02 (g=2) -> v small, prob meaningless viol
 #  -> the smaller you allow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
 # gamma = 3-5: from now on strata by 3 conf, so should have L6=1 & L7=1 & L8=1
-# -> included for a = 0.01/0.01/0.1 & b=0.1, not det for a = 0.025 & b=0.1
+# -> included for a = 0.01/0.05/0.1 & b=0.1, not det for a = 0.025 & b=0.1
 # -> included for a = 0.05/0.1 & b=0.05, not det for a=0.01/0.025 & b=0.05
 
 
@@ -327,13 +327,13 @@ data1 <- sim(dag1, n = 1000)
 table(data1$A)  # balanced
 
 data1 %>% filter(L3 < 4 & A==1) %>% nrow()/
-  data1 %>% filter(L3 < 4) %>% nrow()  # viol P(A=1)~0 for g>=1, b=0.1, a<=0.05 as sample prop =8.3%, maybe esp if all other L_i=0!
+  data1 %>% filter(L3 < 4) %>% nrow()  # viol P(A=1)~0 for g>=1, b>=0.05, a<=0.05 as sample prop =8.3%, maybe esp if all other L_i=0!
 
 # table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
 binary_vars <- paste0("L", c(1,2,4:10))
 tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
 tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>% print(n=64)
-# no viol with binary varsa bc not large enough sample prop that could be relevant
+# no viol with binary vars bc not large enough sample prop that could be relevant
 
 ## PoRT: continuous var L3 uncategorised ----
 source("data/port_utils.R")
@@ -353,7 +353,8 @@ for (g in g_values) {
 }
 lst5
 #sink("output_port/port_10_leftgap_uncat.txt")
-# same results for all g=1-5 as only viol for L3 expected: always det when should tho most precise for a=0.05 & b=gruber
+# same results for all g=1-5 as only viol for L3 expected: always det when should 
+# tho most precise for a=0.05 & b=0.05
 # over all g, if small a <= 0.025, many small strata of L3 bc cont confounder
 
 
@@ -402,15 +403,16 @@ table(data1$A)  # which alr by treatment level distribution
 
 # what strata are those with low support for treated (IV = 1)
 shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-for (i in names(o5)[-11]) {
-  l_values1 <- data1[outliers1, i]
-  diag_values1 <- shift1[outliers1,]
-  plot(l_values1, diag_values1$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
-}  
-# no pattern for other binary vars expect that most have L_i=0 (makes sense bc simulated with low P(A=1))
-# for L3 can see that starting from L3<6 there is few support for IV=1 (A=1) -> clearer that from L3<4 for quantile 0.5!
-# -> as wanted: few obs from L3<4 with A=1 so few support if we intervene these obs on IV=1 (A=1!)
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .05)  # create indices for the "outliers"
+l_values1 <- data1[outliers1, "L3"]
+diag_values1 <- shift1[outliers1,]
+plot(l_values1, diag_values1$diagnostic,
+     xlab = "Values of Confounder L3", ylab = "EDP")
+# plots with L_1 value vs EDP for other binary vars: no pattern expect that most
+#   have L_i=0 (makes sense bc simulated with low P(A=1))
+# not rly clear that there is few support for IV=1 (A=1) from L3<4, also have many with few support for [6,8] 
+#   but at least visible for quantile=0.05 that smallest EDP are on the left side, so they fall into L3<4
+# -> wanted to see that due to few obs from L3<4 with A=1, few support if we intervene these obs on IV=1 (A=1!)
 
 # what strata are those with low support for untreated (IV = 0)
 shift2 <- res5[res5$shift == 2,]
@@ -424,7 +426,8 @@ for (i in names(o5)[-11]) {
 # worse for quantile = 0.5 than for 0.25 bc just overall fewer obs with L3<4 (see sim with low density on left)
 
 # essence: PoRT det viol both in uncat & cat data, tho cat is nicer to interpret if precise enough as here
-#          kbsd also det viol stratum, tho detection dep on choice of EDP threshold (quantile)..
+#          kbsd could not pinpoint that underlying the low EDP there is our viol stratum, tho detection dep on choice of EDP threshold (quantile)..
+
 
 
 
@@ -632,7 +635,7 @@ for (g in g_values) {
 lst5_cat
 #sink("port_10_bimodal_cat.txt")
 # g=1,2: not poss yset to det
-# g = 3-5: only det from a = 0.025 & b=0.01/gruber, again from a = 0.05 & any b
+# g = 3-5: only det for a = 0.025 & b=0.01/gruber, then again from a = 0.05 & any b
 
 # essence: PoRT det safely for larger a & b but weird that not alr earlier!
 

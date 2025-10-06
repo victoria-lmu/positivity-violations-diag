@@ -402,7 +402,7 @@ for (i in names(o5)[-21]) {
   diag_values1 <- shift1[outliers1,]
   plot(l_values1, diag_values1$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
 }  
-# no clear pattern except for vars L1, L5, L7 -> det that lowest EDP are for L5<4 
+# no clear pattern except for vars L1, L5, L7 -> det that lowest EDP are for L5<4 as expected! 
 
 
 # what strata are those with low support for untreated (IV = 0)
@@ -413,7 +413,7 @@ for (i in names(o5)[-21]) {
   diag_values2 <- shift2[outliers2,]
   plot(l_values2, diag_values2$diagnostic, xlab = paste0("Values of Confounder ", i), ylab = "EDP")
 }
-# also low, but more imp only FEW obs with few EDP for L5<4 bc few obs of L5<4 in this subset (most with L5<4 have high EDP values bc a lot with L5<4 & A=0)
+# also low, but more imp only FEW obs with few EDP for L5<4 bc few obs of L5<4 in this subset of having low support (most with L5<4 have high EDP values bc a lot with L5<4 & A=0)
 
 
 # essence: after cat, PoRT aggregates viol subgroup with other cat, i.e. not precise anymore

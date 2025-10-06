@@ -380,7 +380,7 @@ res3_plot
 subset_5 <- res3[res3$diagnostic < quantile(res3[res3$shift==1, "diagnostic"], probs = 0.5)
                  & res3$shift == 1,]
 obs3[subset_5$observation, ]
-table(obs3[subset_5$observation, ][, c("L1", "L2")]) # many L1=0 & L2=0 among treated
+table(obs3[subset_5$observation, ][, c("L3")]) # most with few support among A=1 are from L3=0 as should (#1)
 obs3 %>% filter(L1==0 & L2==0 & A==1) %>% nrow()/obs3 %>% filter(L1==0 & L2==0) %>% nrow() 
    # while few support (prob tied to viol #5), P(A=1|L1=0 & L2=0) not extreme
 table(obs3[subset_5$observation, ][, c("L1", "L3")]) # confirmed that many from L3=0 & L1=0 (#2), ACTUALLY from L3=0 (#1)
@@ -407,7 +407,7 @@ table(obs3[obs3$L1 == 0 & obs3$L2 == 1 & obs3$L3 == 1, "A"])  # not extreme enou
 table(obs3[obs3$L1 == 0 & obs3$L2 == 1 & obs3$L3 == 0, "A"])  # not extreme enough: proba.exposure = 0.16
 table(o3$A)  # also: way more untreated compared to treated in general!
 
-# essence: KBSD found all 4 viol among A=1
+# essence: KBSD found the 4 viol among A=1,
 #          but for A=0, just like PoRT failed to det viol #4 (L1==1 & L2==1 & L3==1),
 #          instead flagged 2 new strata among A=0 that do not present problem actually
 

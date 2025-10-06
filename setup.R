@@ -2,6 +2,7 @@ library(simcausal)
 library(rpart)
 library(purrr)
 library(tidyverse)
+library(modeest)
 theme_set(theme_minimal())
 
 # function defined to compute contingency table for all combos of all binary variables
