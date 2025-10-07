@@ -99,7 +99,7 @@ art %>% filter(facility %in% c("12-Dwaleni", "13-Gege" ,"14-Magubheleni", "15-Ma
 # 3. additionally create table to check for extreme P(A) among binary conf
 #    use customised fun defined in setup.R: 
 binary_vars <- c("phone", "tb", "underTreatAll")
-print(make_strata_table(art, A = "SAMEDAY", binary_vars = binary_vars), n = 125)
+make_strata_table(art, A = "SAMEDAY", binary_vars = binary_vars) %>% arrange(proba_exp) %>% print(n = 125)
 # among intersections of binary vars only, the group with viol is too small to be pos viol
 
 
@@ -110,7 +110,7 @@ res <- list()
 a_values <- c(0.01, 0.025, 0.05, 0.1)
 gruber <- 5/(sqrt(nrow(art))*log(nrow(art)))
 b_values <- c(0.01, gruber, 0.05, 0.1)
-g_values <- 1:16
+g_values <- 1:5
 
 for (g in g_values) {
   for (a in a_values) {
@@ -124,7 +124,9 @@ for (g in g_values) {
   }
 }
 res
-# sink(file = "output_port_cat.txt")
+sink(file = "output_port_uncat.txt")
+res
+sink()
 
 # g = 1: largest viol subgroup: 16-Mashobeni (5.6%)
 # a = 0.01: strata with cd4, hb, alt, bmi, 16-Mashobeni, but v small except 16-Mashobeni which until a <= 0.05, all with high P(A=1)
@@ -135,8 +137,7 @@ res
 #                   creat< 96.2 & creat>=17 & facility=15-Mahlandle,16-Mashobeni (11.3%)
 # a = 0.01: only one with P(A=1)=0: facility=11-Nhlangano-HC,19-Zombodze & creat< 64.7 & creat>=61.9 (1.2%)
 #           -> shown only until b<=0.05 & not clear why bc with P(A=1)=0 still a viol under b=0.1
-#           -> but generally, a=0.01 really small and 46 subgroups that maybe not relevant
-#              (esp now that sill uncategorised!! many of the viol with cd4, bmi, alt, creat as for g=1)
+#           -> but generally, a=0.01 really small and 46 subgroups that maybe not relevant, esp not that still uncat
 # a = 0.025/0.05/0.1 (for beta = 0.1): sex=pregnant & bmi< 30.2 & bmi>=25.1 -> why not alr for a=0.01?
 #                                 (matches with sex as pred for A=1 in kersch paper, but always in combo bc pregnant alone doesn't have extreme P(A))
 # a=0.01 & b=0.01/gruber/0.05 + a = 0.025, b=0.1: TimeHIVToEnrol=3 & other covar -> matches with TimeHIVToEnrol >= 90d as predictor!
@@ -146,22 +147,24 @@ res
 # best choice a=0.05/0.1 & b=0.05/0.1: 8 subgroups in total
 
 # g = 5: same largest sd as g=2, same thing with only facility=11-Nhlangano-HC,19-Zombodze & creat< 64.7 & creat>=61.9 (1.2%) having P(A)=0
-# best choice a=0.05/0.1 & b=0.05/0.1: 11 subgroups in total
+# best choice a=0.05/0.1 & b=0.05/0.1: 12 subgroups in total
 
-# g = 6-16: same largest sd as g=2, same thing with only facility=11-Nhlangano-HC,19-Zombodze & creat< 64.7 & creat>=61.9 (1.2%) having P(A)=0
+# g = 6-16 (no longer in output): same largest sd as g=2, same thing with only facility=11,19 & creat< 64.7 & creat>=61.9 (1.2%) having P(A)=0
 # best choice a=0.05/0.1 & b=0.05/0.1: 12 subgroups in total, other subgroups mainly same (not more than 5 conf for def a stratum)
 
 
 # essence: - a=0.01/0.025 (esp in combo with b=0.01) too detailed (recommend to only employ with knowledge/purpose; if care about small strata)
-#          - with a=0.05/0.1 as recommended in literature, only the following strata detected:
+#          - with g=2, a=0.05, b=gruber/0.05/0.1 as rec in lit:
+#            fac=15,16 & 142<= cd4 < 467 ; fac=16, sex=pregnant & 25.1<= bmi< 30.2
+#          - with a=0.05/0.1:
 #            15-, 16-, 17-, 18-, pregnant, bmi in 25-30, alt >= 10, creat, hb, age = 16-24/25-49, cd4, 2016, who=1, phone=Yes
 #          - sometimes even if subgroup prop >a, only report for larger a not for smaller (not over all a consistently -> alr obs in simulations!)
 #          - obv, for larger g, the subgroups are def as intersections of more conf
 # -> assumption: are predictors for same-day ART often strata with large P(A=1)?
-#    yes, but seldomly alone (only 16-Mashobeni), else intersected with other covars bc only then P(A=1) is "extreme enough"
-#    - for any a, sex=pregnant as viol in combo with other vars with high P(A=1) -> matches that it's a predictor
+#    yes, but seldomly alone (only 16), else intersected with other covars bc only then P(A=1) is "extreme enough"
+#    - for any a, sex=pregnant as viol in combo with other vars with high P(A=1)
 #    - only for a < 0.05, TimeHIVToEnrol =3 (diag >=90d) & always in combo with other var
-#    - only facilities 15-18 reported as with extreme P(A=1), except 12 once for a=0.01,b=0.05 -> check if those are PHC only?
+#    - only fac 15-18 reported as with extreme P(A=1), except 12 once for a=0.01,b=0.05
 #    -> a=0.05/0.1 & b=0.05/0.1 from literature are sufficient for detecting the suspected viol groups
 #       pregnant, PHC (IF PHC = 16-, but then again not all PHC?), but not TimeHIVToEnrol =3
 # interesting that all viol are with v high P(A=1), i.e. v high P(same-day), except for the one with P(A=1)=0!
@@ -203,9 +206,10 @@ res_cat
 # g = 4-16: largest is creat=(0,120] & facility=15-,17-,18- & cd4=(100,200],(350,500],(500, Inf] & bmi=[25,Inf) (11.4%)
 
 # essence: much fewer subgroups also within a=0.05/0.1 after categorisation (maximum is 12 now, vs 46 above)
-#          - with a=0.05/0.1 as recommended in literature, only the following strata detected:
+#          - with g=2, a=0.05, b=gruber/0.05/0.1: only fac=16
+#          - with a=0.05/0.1:
 #            creat=(0,120] & facility=15-,17-,18- & cd4 > 100 & bmi=[25,Inf)
-#            16-, who=1 & year=2016 & cd4=(200,350],(350,500]
+#            fac=16-, who=1 & year=2016 & cd4=(200,350],(350,500]
 #            alt, year =2016
 #          -> assumption: are predictors for same-day ART often strata with large P(A=1)?
 #             yes, but seldomly alone (except for 16- which is a PHC), sex=pregnant & HIVTimeToEnrol only in combo with other covar
@@ -290,19 +294,21 @@ res <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
                                   marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                                   education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                                   hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
-kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
+res_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
      disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                       age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
                       tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
+#ggsave("output_kbsd.png")
 # order of specifying values in disthalf_Vec changes EDP results/BP??????????~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # does order in disthalf_vec have to be equal to col order in o1/o2????????????????
 
 # overall v few EDP bc 16 confounders <=> 16 dimensions
 # fewer support for early ART than for same-day 
 table(art$SAMEDAY)  # which makes sense bc almost twice as many same-day as early
+
 
 # check who/what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 # (within each var, we know what cat has few support then, but diff to agg to critical stratum then/to know which intersections have lowest support)
@@ -315,28 +321,14 @@ for (i in names(art_num)[-17]) {
 }
 #   most from sex=1, from age=1, edu=2, marital=1, year=2015, fac=11, TimeHIVToEnrol=2, underTreatAll=1, who=1, 
 #   cd4= [38,62], tb=0, bmi=22.7, hb=[11.7 12.8 13.8], alt=24, creat=27, phone=1
-# sex (pregnancy)
-l_sex <- art_num[outliers_ind1, "sex"]
-plot(l_sex, outliers_val1)
-table(l_sex)  # most are from sex=1 which is female (non-pregnant) -> few support in A=1/in same-day ART which is entirely poss!
-# PHC
-l_phc <- art_num[outliers_ind1, "facility"]
-plot(l_phc, outliers_val1)
-table(l_phc)  # most with few support for A=1/same-day ART are from SHC (11) -> makes sense bc same-day ART diff in these cases, so few obs
-# TimeHIVToEnrol
-l_TimeHIVToEnrol <- art_num[outliers_ind1, "TimeHIVToEnrol"]
-plot(l_TimeHIVToEnrol, outliers_val1)
-table(l_TimeHIVToEnrol)  # most are from 1-89d between HIV diag to enrolment 
-# -> makes sense esp for fewer days (1,2,3,..) that not much support for A=1/same-day ART bc diag as recent finding (realisation must sink in)
-# age
-l_age <- art_num[outliers_ind1, "age"]
-plot(l_age, outliers_val1)
-table(l_age) # none from 50+ age group, most from 25-49: most in this age group have few obs for A=1 (i.e. rarely got sameday ART)
 
 # essence: obs that got sameday ART/A=1 most rarely of all cat (det bc few obs with similar covar vals were found), are
-#          non-pregnant women, 25-49 yr olds, secondary edu, married, from year 2015,
-#          from a SHC (makes sense bc sameday ART diff in SHC),
-#          with 1-89d between diag & enrolment, under treat all policy,
+#   pred   non-pregnant women (makes sense bc ART not as urgent for them as for pregnant),
+#   pred   from a SHC (makes sense bc same-day ART difficult in SHC),
+#   pred   with 1-89d between diag & enrolment (can make sense esp for few days (1,2,..) bc would not do same-day ART if diag v recent),
+#          25-49 yr olds (few in this medium-age group got same-day ART -> if only look at it univariately; combined with pregnancy/PHC prob more likely)
+#          secondary edu, married, from year 2015,
+#          under treat all policy,
 #          first clinical stage (-> makes sense; if advanced stage, would rather do same-day bc esp urgent), 
 #          without tb (could make sense bc coinfection with tb could also make ART more urgent so that sameday ART), with phone
 # but must always be careful: having more with low EDP from a certain cat if that cat is dominant anyway 
@@ -365,11 +357,15 @@ table(l_phc)  # most from 17, 18 (PHC) -> makes sense bc A=0 (early ART) rarer i
 l_TimeHIVToEnrol <- art_num[outliers_ind2, "TimeHIVToEnrol"]
 table(l_TimeHIVToEnrol)  # most had HIV diag & enrolment on same day, followed by >=90d in between
 # if on same day, v unlikely to get early ART <=> few obs with HIV diag & enrolment on same day in A=0?
-# but 2nd largest group had >=90d in between <=> few obs there makes sense bc not many that get early ART then, rather get A=1?
+# but 2nd largest group had >=90d in between <=> few obs there makes sense bc if diag was longer time ago, more ready for A=1
 
 # essence: obs that got early ART/A=0 most rarely of all cat (det bc few obs with similar covar vals were found), are
-#          non-pregnant women, 25-49 yr olds, secondary edu, married, from year 2015, from a PHC, with diag on same day as enrolment,
+#          non-pregnant women,
+#          from a PHC (bc if from PHC, have the possibility to get same-day ART)
+#          with diag on same day as enrolment,
+#          25-49 yr olds, secondary edu, married, from year 2015,
 #          under treat all policy, first clinical stage, without tb, with phone
+
 
 
 # look at obs/strata that have high EDP!! means they're v likely to receive A=0/A=1/both treatment levels ---
@@ -397,9 +393,7 @@ res_hm <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmea
                              marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                              education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                              hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
-sink("output_kbsd_hm.txt")
-res_hm
-sink()
+#sink("output_kbsd_hm.txt")
 res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmean",
      disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                       age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
@@ -407,4 +401,30 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-ggsave("output_kbsd_hm.png")
+#ggsave("output_kbsd_hm.png")
+
+# double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
+shift1 <- res_hm[res_hm$shift==1,]
+outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.25)  # indices of obs with few support
+outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+# check overall what the obs are that have few EDP:
+for (i in names(art_num)[-17]) {
+  print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
+}
+# diff values for some vars now: TimeHIVToEnrol=1, cd4=74, tb=0, bmi=23, gb=10.7, alt=3&25, creat=54
+# few support for diag & enrolment on same day makes sense -> would rather not start ART immediately (those with diag longer time ago would rather start fast after enrolment)
+# few support ofr 
+
+# double-check what strata have few support among IV=2 (A=0) ---
+shift2 <- res_hm[res_hm$shift==2,]
+outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.25)  # indices of obs with few support
+outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+# check overall what the obs are that have few EDP:
+for (i in names(art_num)[-17]) {
+  print(paste0(i, ": ", mfv(art_num[outliers_ind2, i])))
+}
+# diff vals for: fac=11, cd4=74, tb=0, bmi=22.5&23, hb=10.7, alt=25, creat=54
+# few support for fac=11 among A=0 does not make sense.. but prob just bc many from fac=11
+# so some or most have lots of support for A=0, but some also few support bc with other covar vals!
+
+

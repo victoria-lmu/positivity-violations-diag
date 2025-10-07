@@ -103,6 +103,43 @@ data1 %>% filter(L3 < 6& A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # 
 # essence: both PoRT & kbsd det viol
 
 
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,1]" ~ 1, L3 == "(1,2]" ~ 2, L3 == "(2,3]" ~3, 
+                        L3 == "(3,4]" ~4, L3 =="(4,5]" ~ 5, L3 == "(5,6]" ~6,
+                        L3 == "(6,7]" ~7, L3 == "(7,8]"~8, L3 == "(8, Inf]"~9))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(5,6]" -> poss bc viol is for L3<6
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # least support for IV=1 is for L3="(7,8]" (not expected, not planned)
+
+
+
 
 # 5 Confounders Binary ----
 
@@ -283,7 +320,6 @@ res5_plot <- kbsd(data = o5,
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
                                  L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
 res5_plot  # EDP range between 0-200, fewer support for IV=2
-table(data1$A)  # which alr indicated here by fewer obs in A=0
 
 # subgroup L3<4 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
 shift1 <- res5[res5$shift == 1,]
@@ -303,6 +339,44 @@ plot(l_values2, diag_values2$diagnostic)
 data1 %>% filter(L3 < 4 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # no viol actually
 
 # essence: both PoRT & kbsd det viol that was a left side gap, but PoRT was lazy after cat & didn't flag entire stratum anymore
+
+
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,1]" ~ 1, L3 == "(1,2]" ~ 2, L3 == "(2,3]" ~3, 
+                        L3 == "(3,4]" ~4, L3 =="(4,5]" ~ 5, L3 == "(5,6]" ~6,
+                        L3 == "(6,7]" ~7, L3 == "(7,8]"~8, L3 == "(8, Inf]"~9))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(6,7]" -> not correct should be <4
+table(l_values1)
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # again for L3="(6,7]" (not expected, not planned)
+
 
 
 
@@ -432,8 +506,44 @@ data1 %>% filter(L3 < 6 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow()
 # but actually many obs among A=0 with such values, also EDP threshold here v low
 # so prob enough support overall (also did not have viol with P(A=0)~0)
 
-
 # essence: both PoRT and kbsd found the viol of P(A=1|L3 in [4,6])~0
+
+
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,1]" ~ 1, L3 == "(1,2]" ~ 2, L3 == "(2,3]" ~3, 
+                        L3 == "(3,4]" ~4, L3 =="(4,5]" ~ 5, L3 == "(5,6]" ~6,
+                        L3 == "(6,7]" ~7, L3 == "(7,8]"~8, L3 == "(8, Inf]"~9))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(2,4]" -> should be [4,6] tho!
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # not expected, not planned
+
 
 
 
@@ -545,5 +655,38 @@ data1 %>% filter(L3 < 6& A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # 
 # in 10 Conf scenario the problem with nondetection alr existed for uncorr setting so rather dimensionality problem?)
 
 
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,1]" ~ 1, L3 == "(1,2]" ~ 2, L3 == "(2,3]" ~3, 
+                        L3 == "(3,4]" ~4, L3 =="(4,5]" ~ 5, L3 == "(5,6]" ~6,
+                        L3 == "(6,7]" ~7, L3 == "(7,8]"~8, L3 == "(8, Inf]"~9))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+table(l_values1)  # most with few support for IV=1 are from "(4,5]" -> poss bc viol for <6!
 
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # not expected, not planned
 

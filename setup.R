@@ -3,7 +3,7 @@ library(rpart)
 library(purrr)
 library(tidyverse)
 library(modeest)
-theme_set(theme_minimal())
+theme_set(theme_bw())
 
 # function defined to compute contingency table for all combos of all binary variables
 # and compute exposure probability and sample size

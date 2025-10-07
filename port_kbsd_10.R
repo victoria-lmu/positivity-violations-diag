@@ -63,7 +63,7 @@ lst5
 dat_cat <- dat
 for (i in names(dat_cat)[-1]) {
   if (typeof(dat_cat[[i]]) == "double") {
-    dat_cat[[i]] <- cut(dat_cat[[i]], breaks = c(-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8))
+    dat_cat[[i]] <- cut(dat_cat[[i]], breaks = c(-Inf, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
   }
 }
 lst5_cat <- list()
@@ -195,6 +195,12 @@ res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmea
                                     A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
                      plot.out = F)
 #sink("kbsd_10_hm.txt")
+
+
+## KBSD cat ----
+table(dat_cat$L1)
+table(dat_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 
 
@@ -429,6 +435,46 @@ for (i in names(o5)[-11]) {
 #          kbsd could not pinpoint that underlying the low EDP there is our viol stratum, tho detection dep on choice of EDP threshold (quantile)..
 
 
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,2]" ~ 1, L3 == "(2,3]" ~ 2, L3 == "(3,4]" ~3, 
+                        L3 == "(4,5]" ~4, L3 =="(5,6]" ~ 5, L3 == "(6,7]" ~6,
+                        L3 == "(7,8]"~7, L3 == "(8, Inf]"~8))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(7,8]" -> makes no sense bc viol for <6!
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # not expected, not planned
+
+
 
 
 # 10 Confounders With Middle-Gap ----
@@ -555,6 +601,48 @@ plot(l_values2, diag_values2$diagnostic)  # no low EDP for L3~5 at all, bc all w
 # also, overall v low EDP due to high dim, so try alternative EDP formulas below
 
 
+## KBSD cat ----
+table(data1_cat$L3)
+data1_cat <- data1_cat %>% 
+  mutate(L3 = case_when(L3 == "(-Inf,2]" ~ 1, L3=="(2,3]" ~2, 
+                        L3 == "(3,4]" ~3, L3 =="(4,5]" ~ 4, L3 == "(5,6]" ~5,
+                        L3 == "(6,7]" ~6, L3 == "(7,8]"~7, L3 == "(8, Inf]"~8))
+source("kbsd.R")
+set.seed(15082025)
+o5 <- data1_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                            L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                            L10 = sd(o5$L10), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), L6 = sd(o5$L6),
+                                 L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9),
+                                 L10 = sd(o5$L10), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(6,7]" -> weird bc viol for 4<L3<6!
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- data1_cat[outliers2, "L3"]
+mfv(l_values2)  # (2,3] not expected, not planned as critical obs for A=0
+
+
+
+
 
 # 10 Confounders Correlated ----
 
@@ -618,9 +706,13 @@ lst5
 
 
 ## PoRT: continuous vars categorised ----
-data1_cat <- data1
 source("data/port_utils.R")
-data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 2, 3, 4, 5, 6, 7, 8, Inf))
+dat_cat <- dat
+for (i in names(dat_cat)[-1]) {
+  if (typeof(dat_cat[[i]]) == "double") {
+    dat_cat[[i]] <- cut(dat_cat[[i]], breaks = c(-Inf, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
+  }
+}
 lst5_cat <- list()
 for (g in g_values) {
   for (a in a_values) {
@@ -634,7 +726,7 @@ for (g in g_values) {
 }
 lst5_cat
 #sink("port_10_bimodal_cat.txt")
-# g=1,2: not poss yset to det
+# g=1,2: not poss yet to det
 # g = 3-5: only det for a = 0.025 & b=0.01/gruber, then again from a = 0.05 & any b
 
 # essence: PoRT det safely for larger a & b but weird that not alr earlier!
@@ -675,3 +767,35 @@ table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among
 # essence: both diags det viol, although PoRT fails for smaller a, b values
 
 
+## KBSD cat ----
+table(dat_cat$L3)
+dat_cat <- dat_cat %>% 
+  mutate(L1 = case_when(L1 == "(-Inf,-2]" ~ 1,...)) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+source("kbsd.R")
+set.seed(03102025)
+o5 <- dat_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+res5_plot
+# check what strata have low support for IV=1
+shift1 <- res5[res5$shift == 1,]
+outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
+l_values1 <- dat_cat[outliers1, "L3"]   # original cat L3 values
+mfv(l_values1)  # most with few support for IV=1 are from "(2,4]" -> should be [4,6] tho!
+
+# check where few support for IV=2 (A=0)
+shift2 <- res5[res5$shift == 2,]
+outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
+l_values2 <- dat_cat[outliers2, "L3"]
+mfv(l_values2)  # not expected, not planned
