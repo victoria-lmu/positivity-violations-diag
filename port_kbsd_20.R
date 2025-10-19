@@ -92,21 +92,8 @@ for (g in g_values) {
 }
 lst20_cat
 #sink("output_port/port_20_cat.txt")
-# g = 1: only with other cont vars & only with v small a=0.01/0.025
+# g = 1: only other viol with cont vars & only with v small a=0.01/0.025
 # g = 2-5: det from a>=0.025 & b=0.1! alr shows pos eff of cat CONT conf on detection of viol involving CAT conf
-
-
-# broader categorisation
-dat20_cat <- dat20
-for (i in names(dat20)[1:10]) {
-  dat20_cat[[i]] <- cut(dat20[[i]], breaks = c(-3, 0, 3, 6, 9, 12, 15))
-}
-dat20_cat
-port("A", cov.quanti = NULL,
-     cov.quali = c("L1","L2","L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10",
-                   "L11", "L12", "L13", "L14", "L15", "L16", "L17", "L18", "L19", "L20"),
-     data = dat20_cat, alpha = 0.01, beta = 0.1, gamma = 2)
-# gamma = 2: again for all except a=0.01, with beta = 0.1
 
 
 ## kbsd ----
@@ -170,6 +157,53 @@ res6 <- kbsd(data = o6, int_data_list = list(o6_1, o6_2), type = "harmonicmean",
                             L16 = sd(o6$L16), L17 = sd(o6$L17), L18 = sd(o6$L18), L19 = sd(o6$L19), L20 = sd(o6$L20),
                             A=0.5*sd(o6$A)),  # use 1 SD for L_i, 0.5 SD for A
              plot.out = T)
+
+
+## KBSD cat ----
+table(dat20_cat$L1)
+table(dat20_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values
+dat20_cat <- dat20_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
+                ~ case_when(
+                  . == "(-3,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8,9]"  ~ 12,
+                  . == "(9,10]"     ~ 13, . == "(10,11]"    ~ 13, . == "(11,12]"  ~ 15,
+                  . == "(12,13]"    ~ 16, . == "(13,14]"  ~ 17)))
+source("kbsd.R")
+o5 <- dat20_cat
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                            L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                                 L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                                 A=0.5*sd(o5$A)))
+res5_plot  # overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=1 matches that IV=1 has less support
+
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L19", "L20")]) # no viol expected; most from L9=0 & L10=0 tho that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0): should be L19=1 & L20=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L19", "L20")]) # highest count among IV=0 is L19=1 & L20=1 -> as expected
+
+# essence: kbsd det viol also for cat data
 
 
 
@@ -307,7 +341,7 @@ DAG20 <- DAG.empty() +
   node("L19", distr = "rbern", prob = 0.5) +
   node("L20", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(L1 - L20 - 2*L5*(L5 < 4)))  # now there should be viol if L5 is v small
-# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~1
+# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~0
 DAG20 <- set.DAG(DAG20)
 dat20 <- sim(DAG20, rndseed = 12082025, n = 1000)[-1]
 table(dat20$A)  # balanced
@@ -415,8 +449,54 @@ for (i in names(o5)[-21]) {
 }
 # also low, but more imp only FEW obs with few EDP for L5<4 bc few obs of L5<4 in this subset of having low support (most with L5<4 have high EDP values bc a lot with L5<4 & A=0)
 
-
 # essence: after cat, PoRT aggregates viol subgroup with other cat, i.e. not precise anymore
+
+
+## KBSD cat ----
+table(dat20_cat$L1)
+table(dat20_cat$L9)  # all have same categorisation -> give numerical repr to compute kbsd values
+dat20_cat <- dat20_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
+                ~ case_when(
+                  . == "(-3,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8,9]"  ~ 12,
+                  . == "(9,10]"     ~ 13, . == "(10,11]"    ~ 13, . == "(11,12]"  ~ 15,
+                  . == "(12,13]"    ~ 16, . == "(13,14]"  ~ 17)))
+source("kbsd.R")
+o5 <- dat20_cat
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                            L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                                 L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                                 A=0.5*sd(o5$A)))
+res5_plot  # IV=1 with a bit more support
+table(o5$A)  # also more obs for that
+
+# what strata are those with low support for treated (IV = 1): should be L3<4
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L3")]) #  as expected; most from L3=[2,4] that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0)
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L3")]) # no viol expected
+
+# essence: kbsd also det the critical stratum L3<4 after cat
 
 
 
@@ -448,7 +528,6 @@ DAG20 <- DAG.empty() +
   node("L19", distr = "rbern", prob = 0.5) +
   node("L20", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(L1 - L20 - 2*L5*(L5 > 4 & L5 < 6)))  # now there should be viol if L5 is v small
-# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~1
 DAG20 <- set.DAG(DAG20)
 dat20 <- sim(DAG20, rndseed = 12082025, n = 1000)[-1]
 table(dat20$A)  # balanced
@@ -561,6 +640,55 @@ for (i in names(o5)[-21]) {
 # maybe to make stratum as large as poss?), also kbsd did not detect that few support in L5=[4,6]
 
 
+## KBSD cat ----
+table(dat20_cat$L1)
+table(dat20_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values
+dat20_cat <- dat20_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
+                ~ case_when(
+                  . == "(-3,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8,9]"  ~ 12,
+                  . == "(9,10]"     ~ 13, . == "(10,11]"    ~ 13, . == "(11,12]"  ~ 15,
+                  . == "(12,13]"    ~ 16, . == "(13,14]"  ~ 17)))
+summary(dat20_cat)
+source("kbsd.R")
+o5 <- dat20_cat
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                            L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                                 L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                                 A=0.5*sd(o5$A)))
+res5_plot  # overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=1 matches that IV=1 has less support
+
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L3")]) # most from L3=[3,4] that have low support in IV=1 -> should be [4,6] tho
+
+# what strata are those with low support for treated (IV = 0): should be L19=1 & L20=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L3")]) # no viol expected
+
+# essence: after cat, kbsd did not find stratum with viol for A=1
+
+
+
 
 # 20 Confounders Correlated ----
 
@@ -587,7 +715,7 @@ DAG20 <- DAG.empty() +
   node("L19", distr = "rbern", prob = 0.5) +
   node("L20", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(L1 - L2 + L5*L19*L20))
-# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~1
+# if one of L19 and L20 = 0, then P(A)~0.26, if both =1 then P(A)~1, i.e. viol for P(A=0|L)~0
 DAG20 <- set.DAG(DAG20)
 dat20 <- sim(DAG20, rndseed = 12082025, n = 1000)[-1]
 table(dat20$A)  # balanced
@@ -705,3 +833,49 @@ table(o6[subset_6_2$observation, c("L19", "L20")])
 
 # essence: PoRT & kbsd found viol, but PoRT did not always when should (cat made it slightly better, but still undet for smaller a, however smaller a also not that imp maybe)
 
+
+## KBSD cat ----
+table(dat20_cat$L1)
+table(dat20_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values
+dat20_cat <- dat20_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
+                ~ case_when(
+                  . == "(-3,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8,9]"  ~ 12,
+                  . == "(9,10]"     ~ 13, . == "(10,11]"    ~ 13, . == "(11,12]"  ~ 15,
+                  . == "(12,13]"    ~ 16, . == "(13,14]"  ~ 17)))
+source("kbsd.R")
+o5 <- dat20_cat
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                            L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 L11=sd(o5$L11), L12 = sd(o5$L12), L13 = sd(o5$L13), L14 = sd(o5$L14), L15 = sd(o5$L15),
+                                 L16 = sd(o5$L16), L17 = sd(o5$L17), L18 = sd(o5$L18), L19 = sd(o5$L19), L20 = sd(o5$L20),
+                                 A=0.5*sd(o5$A)))
+res5_plot  # overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=1 matches that IV=1 has less support
+
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L19", "L20")]) # no viol expected
+
+# what strata are those with low support for treated (IV = 0): should be L19=1 & L20=1, bc for these values will always get A=1, rarely A=0
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L19", "L20")]) # highest count among IV=0 is L19=1 & L20=1 -> as expected
+
+# essence: kbsd det viol also after cat

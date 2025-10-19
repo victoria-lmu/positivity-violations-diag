@@ -78,10 +78,13 @@ for (g in g_values) {
   }
 }
 lst5_cat
-#sink("port_10_cat.txt")
+# sink("port_10_cat.txt")
+# lst5_cat
+# sink()
 # gamma = 1: no critical subgroup
 # gamma = 2: v small subgroups for a=0.01 only
-# g= 3-5: det for a = 0.025/0.05/0.1 & b=0.1 & undet for a = 0.01, b = 0.1  -> weird that not det for a = 0.01
+# g= 3-5: det for all a & b=0.05
+#         undet for a = 0.01, b = 0.1  -> weird that not det for a = 0.01
 #    maybe bc if cat, then a=0.01 (too small a) lets focus on small strata only??
 #    but was also problem in 20_cof_UNCAT setting so not sure if tied to categorisation -> maybe randomness?
 #         det for all a & b=0.05 tho -> so weird, bc b=0.1 allows for more, hypothesis here:
@@ -175,7 +178,7 @@ res5_mv <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "minval",
 # sink("kbsd_10_mv.txt")
 # print(res5_mv)
 # sink()
-# did not work with minval????????????????????????????????????????
+# did not work with minval?
 
 
 # type = "harmonicmean" instead of default type = "Rfast"
@@ -199,8 +202,47 @@ res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmea
 
 ## KBSD cat ----
 table(dat_cat$L1)
-table(dat_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+table(dat_cat$L2)  # all have same categorisation -> give numerical repr to compute kbsd values
+dat_cat <- dat_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5")), 
+                ~ case_when(
+                  . == "(-Inf,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8, Inf]"  ~ 12)))
+source("kbsd.R")
+o5 <- dat_cat[-1]
+o5_1 <- o5
+o5_1$A <- 1
+o5_2 <- o5
+o5_2$A <- 0
+res5 <- kbsd(data = o5,
+             int_data_list = list(o5_1, o5_2),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
+res5_plot <- kbsd(data = o5,
+                  int_data_list = list(o5_1, o5_2),
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 A=0.5*sd(o5$A)))
+res5_plot
+# overall v few EDP as high-dim adjustment set
+table(o5$A)  # a few less obs for A=0 could've indicated that there'll be less support for IV=2 (A=0)
 
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L1", "L2", "L3")])
+table(o5[subset_5_1$observation, c("L3", "L4", "L5")])
+table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
+table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from L9=1 & L10=0 tho that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# essence: both for uncat & for cat data, kbsd correctly flagged the critical stratum as with low EDP
 
 
 
@@ -672,14 +714,14 @@ dat$L2 <- 2*dat$L1 + rnorm(1000,0,1)
 cor(dat$L2, dat$L1)  # cor of 0.88
 hist(dat$L2)
 dat$L10 <- dat$L9
-cor(dat$L10, dat$L9)  # cor of 1   - but corr does not involve vars of viol.. stupid?~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cor(dat$L10, dat$L9)  # cor of 1   - but corr does not involve vars of viol.. stupid?
 
 # table to check for all combos of binary conf if there are any with extreme P(A)
 binary_vars <- paste0("L", 6:10)
 tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)  # function defined in setup.R
 tab %>% filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)  # defo L6=1 & L7=1 & L8=1 as viol
 dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
-  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # should be det for any b, any a as sample prop = 11.7%
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # P(A=1|L)~1 <=> P(A=0|L)~0 & to be det for any b, any a as sample prop = 11.7%
 
 
 ## PoRT: continuous vars uncategorised ----
@@ -720,14 +762,16 @@ for (g in g_values) {
       lst5_cat[[paste0("gamma=", g, ", alpha = ", a, ", beta = ", b)]] <-
         port(A = "A", cov.quanti = NULL,
              cov.quali = c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"),
-             data = data1_cat, alpha = a, beta = b, gamma = g)
+             data = dat_cat, alpha = a, beta = b, gamma = g)
     }
   }
 }
 lst5_cat
-#sink("port_10_bimodal_cat.txt")
+# sink("port_10_corr_cat.txt")
+# lst5_cat
+# sink()
 # g=1,2: not poss yet to det
-# g = 3-5: only det for a = 0.025 & b=0.01/gruber, then again from a = 0.05 & any b
+# g = 3-5: never det for a = 0.01, only det for a = 0.025 & b=0.01/gruber, then again from a = 0.05 & any b
 
 # essence: PoRT det safely for larger a & b but weird that not alr earlier!
 
@@ -768,11 +812,15 @@ table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among
 
 
 ## KBSD cat ----
-table(dat_cat$L3)
-dat_cat <- dat_cat %>% 
-  mutate(L1 = case_when(L1 == "(-Inf,-2]" ~ 1,...)) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+table(dat_cat$L1) # give numerical repr to L1-L5 to compute kbsd values
+dat_cat <- dat_cat %>%
+  mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5")), 
+                ~ case_when(
+                  . == "(-Inf,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
+                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
+                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
+                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8, Inf]"  ~ 12)))
 source("kbsd.R")
-set.seed(03102025)
 o5 <- dat_cat[-1]
 o5_1 <- o5
 o5_1$A <- 1
@@ -780,22 +828,25 @@ o5_2 <- o5
 o5_2$A <- 0
 res5 <- kbsd(data = o5,
              int_data_list = list(o5_1, o5_2),
-             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
-                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                            L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                            A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
              plot.out = F)
 res5_plot <- kbsd(data = o5,
                   int_data_list = list(o5_1, o5_2),
-                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
-                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
-res5_plot
-# check what strata have low support for IV=1
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values1 <- dat_cat[outliers1, "L3"]   # original cat L3 values
-mfv(l_values1)  # most with few support for IV=1 are from "(2,4]" -> should be [4,6] tho!
+                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                                 L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                                 A=0.5*sd(o5$A)))
+res5_plot  # overall few EDP as high-dim adjustment set
+table(o5$A)
 
-# check where few support for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
-l_values2 <- dat_cat[outliers2, "L3"]
-mfv(l_values2)  # not expected, not planned
+# what strata are those with low support for treated (IV = 1)
+subset_5_1 <- res5[res5$diagnostic < median(res5[res5$shift == 1, "diagnostic"]) & res5$shift == 1,]
+table(o5[subset_5_1$observation, c("L6", "L7", "L8")])
+table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from L9=0 & L10=1 tho that have low support in IV=1
+
+# what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
+subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
+table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# essence: kbsd also identified the viol with cat data

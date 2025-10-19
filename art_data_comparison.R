@@ -124,9 +124,8 @@ for (g in g_values) {
   }
 }
 res
-sink(file = "output_port_uncat.txt")
-res
-sink()
+#sink(file = "output_port_uncat.txt")
+
 
 # g = 1: largest viol subgroup: 16-Mashobeni (5.6%)
 # a = 0.01: strata with cd4, hb, alt, bmi, 16-Mashobeni, but v small except 16-Mashobeni which until a <= 0.05, all with high P(A=1)
@@ -229,7 +228,7 @@ res_cat
 source("kbsd.R")
 
 # kbsd cannot deal with factors (only cont + binary, bc binary seen as cont),
-# bc SD not computable for factors -> encode to multiclass var with numerical repr:
+# bc SD not computable for factors -> encode to cont ("multiclass") var with numerical repr:
 # sex, age, edu, year, facility, timeHIVto Enrol, undertreatall, who, tb, phone
 
 art_num <- art %>%
@@ -278,6 +277,24 @@ table(art$phone, art_num$phone)
 
 summary(art_num)
 
+
+## check for correlation ----
+abs(cor(art_num)) > 0.3  # who & tb/cd4, sex & age/bmi/hb/creat, underTreatAll & TimeHIVToEnrol
+cor(art_num$who, art_num$tb)
+cor(art_num$who, art_num$cd4)  # the more advanced the stage, the fewer cd4 cells makes sense
+
+cor(art_num$sex, art_num$age)
+cor(art_num$sex, art_num$bmi)  # pregnancy associated with higher BMI makes sense
+cor(art_num$sex, art_num$hb)
+cor(art_num$sex, art_num$creat)
+
+cor(art_num$underTreatAll, art_num$TimeHIVToEnrol) # strong neg corr: if initiated ART
+# under treat all policy, then usually less time between diag&enrol bc policy facilitates faster enrolment & ART start?
+
+cor(art_num$facility, art_num$SAMEDAY)  # also almost cor=0.3
+
+
+
 # marital status, education, sex_pregnant, TimeHIVToEnrol, underTreatAll, cd4, who clinical stage, bmi, hb, alt, creat, phone
 
 # all 16 confounders ---
@@ -301,9 +318,9 @@ res_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("output_kbsd.png")
-# order of specifying values in disthalf_Vec changes EDP results/BP??????????~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# does order in disthalf_vec have to be equal to col order in o1/o2????????????????
+#ggsave("output_kbsd_new.png", width = 8, height = 6)
+# order of specifying values in disthalf_Vec changes EDP results/BP??~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# does order in disthalf_vec have to be equal to col order in o1/o2?
 
 # overall v few EDP bc 16 confounders <=> 16 dimensions
 # fewer support for early ART than for same-day 
@@ -313,39 +330,41 @@ table(art$SAMEDAY)  # which makes sense bc almost twice as many same-day as earl
 # check who/what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 # (within each var, we know what cat has few support then, but diff to agg to critical stratum then/to know which intersections have lowest support)
 shift1 <- res[res$shift==1,]
-outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.25)  # indices of obs with few support
-outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.05)#0.05
+outliers_val1 <- shift1[outliers_ind1, "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
 }
-#   most from sex=1, from age=1, edu=2, marital=1, year=2015, fac=11, TimeHIVToEnrol=2, underTreatAll=1, who=1, 
-#   cd4= [38,62], tb=0, bmi=22.7, hb=[11.7 12.8 13.8], alt=24, creat=27, phone=1
+# quantile=0.25: most from sex=1, from age=1, edu=2, marital=1, year=2015, fac=11, TimeHIVToEnrol=2, 
+#  underTreatAll=1, who=1, cd4= [38,62], tb=0, bmi=22.7, hb=[11.7 12.8 13.8], alt=24, creat=27, phone=1
+# quantile =0.05: only diff in sex=0, some clinical vars
 
 # essence: obs that got sameday ART/A=1 most rarely of all cat (det bc few obs with similar covar vals were found), are
-#   pred   non-pregnant women (makes sense bc ART not as urgent for them as for pregnant),
-#   pred   from a SHC (makes sense bc same-day ART difficult in SHC),
-#   pred   with 1-89d between diag & enrolment (can make sense esp for few days (1,2,..) bc would not do same-day ART if diag v recent),
+#   pred   non-pregnant women (men for quantile=0.05),
+#   pred   from a SHC,
+#   pred   with 1-89d between diag & enrolment,
 #          25-49 yr olds (few in this medium-age group got same-day ART -> if only look at it univariately; combined with pregnancy/PHC prob more likely)
-#          secondary edu, married, from year 2015,
-#          under treat all policy,
-#          first clinical stage (-> makes sense; if advanced stage, would rather do same-day bc esp urgent), 
-#          without tb (could make sense bc coinfection with tb could also make ART more urgent so that sameday ART), with phone
+#          secondary edu, married, from year 2015, under treat all policy, first clinical stage, without tb, with phone
 # but must always be careful: having more with low EDP from a certain cat if that cat is dominant anyway 
 # is kind of normal? e.g. underTreatAll as almost 10x more with =1, so there'll prob more often be obs with =1 in general!
-
+art_num[outliers_ind1,] %>% nrow()  # q=0.05: 67 obs
+art_num[outliers_ind1,] %>% filter(facility %in% 11) %>% nrow()  # q=0.05: 43(majority) from SHC
+art_num[outliers_ind1,] %>% select(TimeHIVToEnrol) %>% table()  # q=0.05: most from 1-89d 
+art_num[outliers_ind1,] %>% select(tb) %>% table()
 
 
 # what obs/strata have few support in IV=2 (A=0) ---
 shift2 <- res[res$shift==2,]
-outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.25)  # indices of obs with few support
-outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.05)  # indices of obs with few support
+outliers_val2 <- shift2[outliers_ind2, "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind2, i])))
 }
-#   most from sex=1, age=1, edu=2, marital=1, year=2015, fac=18, timeHIVToEnrol=1, underTreatAll=1, who=1,
+# quantile=0.25: most from sex=1, age=1, edu=2, marital=1, year=2015, fac=18, timeHIVToEnrol=1, underTreatAll=1, who=1,
 #   cd4 = 74/189, tb=0, bmi=23.4, hb=11.1/12.6, alt=3, creat=27, phone=1
+# quantile=0.05: diff for fac=16, timeHIVToEnrol=3, some clinical vars
 # sex (pregnancy)
 l_sex <- art_num[outliers_ind2, "sex"]
 table(l_sex)   # expected higher count for pregnant (2), but makes sense that not few support for A=0 
@@ -358,11 +377,17 @@ l_TimeHIVToEnrol <- art_num[outliers_ind2, "TimeHIVToEnrol"]
 table(l_TimeHIVToEnrol)  # most had HIV diag & enrolment on same day, followed by >=90d in between
 # if on same day, v unlikely to get early ART <=> few obs with HIV diag & enrolment on same day in A=0?
 # but 2nd largest group had >=90d in between <=> few obs there makes sense bc if diag was longer time ago, more ready for A=1
+art_num[outliers_ind2,] %>% nrow()  # q=0.05: 67 obs
+art_num[outliers_ind2,] %>% filter(facility %in% 12:19) %>% nrow()  # q=0.05: 57(majority) from SHC
+art_num[outliers_ind2,] %>% select(TimeHIVToEnrol) %>% table()  # q=0.05: most from <90d
+art_num[outliers_ind2,] %>% select(sex) %>% table()
+
+
 
 # essence: obs that got early ART/A=0 most rarely of all cat (det bc few obs with similar covar vals were found), are
 #          non-pregnant women,
-#          from a PHC (bc if from PHC, have the possibility to get same-day ART)
-#          with diag on same day as enrolment,
+#          fac = 18/PHC (for quantile=0.05: fac=16/PHC)
+#          with diag on same day as enrolment (q=0.05: >=90d in between),
 #          25-49 yr olds, secondary edu, married, from year 2015,
 #          under treat all policy, first clinical stage, without tb, with phone
 
@@ -393,7 +418,7 @@ res_hm <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmea
                              marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                              education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                              hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
-#sink("output_kbsd_hm.txt")
+#saveRDS(res_hm, "output_kbsd_hm.RDS)
 res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmean",
      disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                       age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
@@ -401,7 +426,7 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("output_kbsd_hm.png")
+#ggsave("output_kbsd_hm_new.png", width = 8, height = 6)
 
 # double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 shift1 <- res_hm[res_hm$shift==1,]
@@ -411,9 +436,9 @@ outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.25), "
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
 }
-# diff values for some vars now: TimeHIVToEnrol=1, cd4=74, tb=0, bmi=23, gb=10.7, alt=3&25, creat=54
+# diff values for some vars now: TimeHIVToEnrol=1, cd4=74, bmi=23 instead of 22.7, hb=10.7, alt=3&25, creat=54
 # few support for diag & enrolment on same day makes sense -> would rather not start ART immediately (those with diag longer time ago would rather start fast after enrolment)
-# few support ofr 
+
 
 # double-check what strata have few support among IV=2 (A=0) ---
 shift2 <- res_hm[res_hm$shift==2,]
@@ -423,8 +448,10 @@ outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.25), "
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind2, i])))
 }
-# diff vals for: fac=11, cd4=74, tb=0, bmi=22.5&23, hb=10.7, alt=25, creat=54
+# diff vals for: fac=11, cd4=74, tb=0, bmi=22.5&23, hb=10.7, alt=25, creat= 17&54
 # few support for fac=11 among A=0 does not make sense.. but prob just bc many from fac=11
 # so some or most have lots of support for A=0, but some also few support bc with other covar vals!
 
-
+r <- (res_plot + ylab("Effective Data Points (EDP)") + ylim(0,10) )| 
+  (res_hm_plot + ylab("Effective Data Points (EDP)") + ylim(0,250))
+#ggsave("output_kbsd_both.png")

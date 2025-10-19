@@ -2,6 +2,7 @@ library(simcausal)
 library(rpart)
 library(purrr)
 library(tidyverse)
+library(patchwork)
 library(modeest)
 theme_set(theme_bw())
 
