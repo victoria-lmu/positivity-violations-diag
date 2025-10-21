@@ -382,6 +382,23 @@ art_num[outliers_ind2,] %>% filter(facility %in% 12:19) %>% nrow()  # q=0.05: 57
 art_num[outliers_ind2,] %>% select(TimeHIVToEnrol) %>% table()  # q=0.05: most from <90d
 art_num[outliers_ind2,] %>% select(sex) %>% table()
 
+# identify manually what strata the obs with few EDP belong to
+indices_outliers <- unique(res[res$shift == 1 & 
+                                  res$diagnostic < quantile(res[res$shift ==1, "diagnostic"], 0.05), "observation"])
+art_num[indices_outliers, ] %>% nrow() # exploratively
+
+for (i in names(art_num)[-17]) {
+  print(i)
+  print(table(art_num[indices_outliers, i])/nrow(art_num[indices_outliers, ]), end="\n\n")
+}
+indices_outliers0 <- unique(res[res$shift == 2 & 
+                                   res$diagnostic < quantile(res[res$shift ==2, "diagnostic"], 0.05), "observation"])
+art_num[indices_outliers0, ] %>% nrow()
+for (i in names(art_num)[-17]) {
+  print(i)
+  print(table(art_num[indices_outliers0, i])/nrow(art_num[indices_outliers, ]), end="\n\n")
+}
+
 
 
 # essence: obs that got early ART/A=0 most rarely of all cat (det bc few obs with similar covar vals were found), are
@@ -430,8 +447,8 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
 
 # double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 shift1 <- res_hm[res_hm$shift==1,]
-outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.25)  # indices of obs with few support
-outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.05)  # indices of obs with few support
+outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.05), "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
@@ -442,8 +459,8 @@ for (i in names(art_num)[-17]) {
 
 # double-check what strata have few support among IV=2 (A=0) ---
 shift2 <- res_hm[res_hm$shift==2,]
-outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.25)  # indices of obs with few support
-outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.25), "diagnostic"]  # diag values of obs with few support
+outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.05)  # indices of obs with few support
+outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.05), "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
   print(paste0(i, ": ", mfv(art_num[outliers_ind2, i])))

@@ -21,8 +21,11 @@ DAG <- DAG.empty() +
 # if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.95
 DAG <- DAG 
 DAG <- set.DAG(DAG)
-dat <- sim(DAG, n = 1000)
+dat <- sim(DAG, n = 1000, rndseed = 23092025)
 table(dat$A)  # balanced
+
+dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # to be det for g>=3, b=0.1, any a
 
 # table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
 binary_vars <- paste0("L", 6:10) # again, L6...L10 are binary
@@ -49,7 +52,9 @@ for (g in g_values) {
   }
 }
 lst5
-#sink("port_10_uncat.txt")
+# sink("port_10_uncat.txt")
+# lst5
+# sink()
 # gamma = 1,2: irrelevant for defined critical stratum bc not yet poss to cover as intersection of 3
 #  -> so other viol among cont conf, but only for a=0.01 (g=1) and a=0.01/0.02 (g=2) -> v small, prob meaningless viol
 #  -> the smaller you allow the subgroups to be, the extremer the pos viol can be defined WITH CONT CONF
@@ -124,6 +129,8 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+# identify what points have low support, with cat data!
 
 # essence: PoRT directly returns strata (can check if sensible in context -> don't need to know viol in advance),
 #          for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
@@ -210,6 +217,8 @@ dat_cat <- dat_cat %>%
                   . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
                   . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
                   . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8, Inf]"  ~ 12)))
+table(dat_cat$L1)
+table(dat_cat$L2)
 source("kbsd.R")
 o5 <- dat_cat[-1]
 o5_1 <- o5
@@ -242,6 +251,18 @@ table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from 
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] # exploratively -> v diff now to do manually 
+
+indices_outliers0 <- unique(res5[res5$shift == 2 & 
+                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers0, ] %>% nrow()
+o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # majority det as from the critical stratum
+o5[indices_outliers0, ] %>% filter(!(L6==1 & L7==1 & L8==1))  # 21 remaining obs -> also diff to recognise strata manually
+
+
 # essence: both for uncat & for cat data, kbsd correctly flagged the critical stratum as with low EDP
 
 
@@ -262,12 +283,15 @@ DAG <- DAG.empty() +
   node("L9", distr = "rbern", prob = 0.5) +
   node("L10", distr = "rbern", prob = 0.5) +
   node("A", distr = "rbern", prob = plogis(3*L6*L7*L8))  # A only depends on these conf;
-# if one of them =0, then P(A)=0.5; if all =1, then P(A)=0.95
+# if one of them =0, then P(A)=0.5; if all =1, then P(A=1)=0.95 -> viol for A=0
 
 DAG <- DAG 
 DAG <- set.DAG(DAG)
-dat <- sim(DAG, n = 1000)
+dat <- sim(DAG, n = 1000, rndseed = 03102025)
 table(dat$A)  # balanced
+
+dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # to be det for g>=3, b=0.1, any a
 
 # table to check for all combos of binary conf if there are any with extreme P(A)
 binary_vars <- paste0("L", 1:10)
@@ -297,7 +321,9 @@ for (g in g_values) {
   }
 }
 lst5
-# sink("output_port/port_10_binary.txt")
+# sink("port_10_binary.txt")
+# lst5
+# sink()
 # g=1,2: no viol bc not yet inteserction of 3 poss
 # g=3: always det for any a & b=0.1
 # g=4: always det for any a & b=0.1, with additional L_i for any a & b=0.05
@@ -342,6 +368,19 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
+
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] # exploratively -> v diff now to do manually 
+
+indices_outliers0 <- unique(res5[res5$shift == 2 & 
+                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers0, ] %>% nrow()
+o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # majority det as from the critical stratum
+o5[indices_outliers0, ] %>% filter(!(L6==1 & L7==1 & L8==1))  # 5 remaining obs -> also diff to recognise strata manually
+
+
 # essence: PoRT & kbsd detected viol -> binary case seems v agréable for both diags
 
 
@@ -371,11 +410,11 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 06102025)
 table(data1$A)  # balanced
 
 data1 %>% filter(L3 < 4 & A==1) %>% nrow()/
-  data1 %>% filter(L3 < 4) %>% nrow()  # viol P(A=1)~0 for g>=1, b>=0.05, a<=0.05 as sample prop =8.3%, maybe esp if all other L_i=0!
+  data1 %>% filter(L3 < 4) %>% nrow()  # viol P(A=1)~0 for g>=1, b>=GRUBER (modified 20.10.!), a<=0.05 as sample prop =8.9%, maybe esp if all other L_i=0!
 
 # table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
 binary_vars <- paste0("L", c(1,2,4:10))
@@ -400,7 +439,9 @@ for (g in g_values) {
   }
 }
 lst5
-#sink("output_port/port_10_leftgap_uncat.txt")
+# sink("port_10_leftgap_uncat.txt")
+# lst5
+# sink()
 # same results for all g=1-5 as only viol for L3 expected: always det when should 
 # tho most precise for a=0.05 & b=0.05
 # over all g, if small a <= 0.025, many small strata of L3 bc cont confounder
@@ -422,7 +463,9 @@ for (g in g_values) {
   }
 }
 lst5_cat
-#sink("output_port/port_10_leftgap_cat.txt")
+# sink("port_10_leftgap_cat.txt")
+# lst5_cat
+# sink()
 # also same over all g=1-5, no viol ofr other binary conf as expected
 
 
@@ -473,6 +516,12 @@ for (i in names(o5)[-11]) {
 # no real pattern: makes sense that support for A=0 is fine among L3<4 bc most in this stratum got A=0!
 # worse for quantile = 0.5 than for 0.25 bc just overall fewer obs with L3<4 (see sim with low density on left)
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow() # exploratively
+o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
+
 # essence: PoRT det viol both in uncat & cat data, tho cat is nicer to interpret if precise enough as here
 #          kbsd could not pinpoint that underlying the low EDP there is our viol stratum, tho detection dep on choice of EDP threshold (quantile)..
 
@@ -516,6 +565,11 @@ outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
 l_values2 <- data1_cat[outliers2, "L3"]
 mfv(l_values2)  # not expected, not planned
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow() # exploratively
+o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
 
 
 
@@ -544,7 +598,7 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 30092025)
 
 data1 %>% filter(L3> 4 &L3 < 6 & A==1) %>% nrow()/
   data1 %>% filter(L3> 4 &L3 < 6) %>% nrow()  # viol P(A=1)~0 for g>=1, any b, any a bc sample prop = 16%, maybe esp if all other L_i=0!
@@ -642,6 +696,12 @@ plot(l_values2, diag_values2$diagnostic)  # no low EDP for L3~5 at all, bc all w
 # the more in center, the higher the support, except between 4-6 rarer
 # also, overall v low EDP due to high dim, so try alternative EDP formulas below
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow() # exploratively
+o5[indices_outliers, ] %>% filter(L3 > 3 & L3 < 6) %>% nrow()
+
 
 ## KBSD cat ----
 table(data1_cat$L3)
@@ -683,6 +743,16 @@ l_values2 <- data1_cat[outliers2, "L3"]
 mfv(l_values2)  # (2,3] not expected, not planned as critical obs for A=0
 
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow() # exploratively
+o5[indices_outliers, ] %>% filter(L3 > 3 & L3 < 6) %>% nrow()
+
+indices_outliers0 <- unique(res5[res5$shift == 2 & 
+                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers0, ]
+
 
 
 
@@ -705,7 +775,7 @@ DAG <- DAG.empty() +
 # if one of these 3 conf =0, then P(A)=0.5; if all =1, then P(A)=0.95
 DAG <- DAG 
 DAG <- set.DAG(DAG)
-dat <- sim(DAG, n = 1000)
+dat <- sim(DAG, n = 1000, rndseed = 23092025)
 table(dat$A)  # balanced
 hist(dat$L2)
 
@@ -721,7 +791,7 @@ binary_vars <- paste0("L", 6:10)
 tab <- make_strata_table(dat, A = "A", binary_vars = binary_vars)  # function defined in setup.R
 tab %>% filter((proba_exp <=0.1 | proba_exp >= 0.9) & sample_prop >= 0.01)  # defo L6=1 & L7=1 & L8=1 as viol
 dat %>% filter(L6==1 & L7==1 & L8==1 & A==1) %>% nrow()/
-  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # P(A=1|L)~1 <=> P(A=0|L)~0 & to be det for any b, any a as sample prop = 11.7%
+  dat %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # P(A=1|L)~1 <=> P(A=0|L)~0 & to be det for b=0.1, any a as sample prop = 13%
 
 
 ## PoRT: continuous vars uncategorised ----
@@ -808,6 +878,17 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < quantile(res5[res5$shift == 2, "diagnostic"], 0.25) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] # exploratively
+
+indices_outliers0 <- unique(res5[res5$shift == 2 & 
+                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers0, ] %>% nrow()
+o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+
+
 # essence: both diags det viol, although PoRT fails for smaller a, b values
 
 
@@ -848,5 +929,17 @@ table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from 
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
+
+
+# identify obs with few support
+indices_outliers <- unique(res5[res5$shift == 1 & 
+                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] # exploratively
+
+indices_outliers0 <- unique(res5[res5$shift == 2 & 
+                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers0, ] %>% nrow()
+o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+
 
 # essence: kbsd also identified the viol with cat data

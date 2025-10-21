@@ -13,10 +13,10 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 
 # check for extreme probs with cont conf L3:
-data1 %>% filter(L3<6 & A==1) %>% nrow()/data1 %>% filter(L3<6) %>% nrow()  # viol: for g >=1, any a & any b as sample prop = 50.8%
+data1 %>% filter(L3<6 & A==1) %>% nrow()/data1 %>% filter(L3<6) %>% nrow()  # viol: for g >=1, any a & any b as sample prop = 52%
 
 # check via table for extreme probs for all combos of binary conf: def in setup.R
 binary_vars <- paste0("L", c(1,2,4,5))
@@ -45,8 +45,8 @@ lst5
 
 
 ## PoRT: continuous var L3 categorised ----
-data1_cat <- data1
 source("data/port_utils.R")
+data1_cat <- data1
 data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
 lst5_cat <- list()
 for (g in g_values) {
@@ -82,34 +82,16 @@ res5_plot <- kbsd(data = o5,
 res5_plot  # EDP range between 0-200, fewer support for IV=1
 table(data1$A)  # which alr indicated here by fewer obs in A=1
 
-# subgroup L3<6 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]
-diag_values1 <- shift1[outliers1,]
-plot(l_values1, diag_values1$diagnostic)
-# clear that most low EDP points stem from side where L3 <6 -> bc few values for L3<4 with A=1
-
-# also check for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values2 <- data1[outliers2, "L3"]  # original L3 values
-diag_values2 <- shift1[outliers2,] # diag values
-plot(l_values2, diag_values2$diagnostic)
-# looks as for A=1, but broader EDP range alr bc overall more support here
-# but also indicates fewer support for L3<6, so check:
-data1 %>% filter(L3 < 6& A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # no viol actually, all obs with L3<6 are in A=0!
-
-# essence: both PoRT & kbsd det viol
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
+# identify obs with low EDP: subgroup L3<6 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 < 6) %>% nrow()
 # q=0.05: 77/93 from critical stratum -> majority of obs reported as critical are from viol stratum!
 # q=0.01: 19/20 from critical stratum!
 o5[indices_outliers, ] %>% filter(!(L3 < 6))
 # q=0.05: quite a lot from (L1== 0 & L2==1 & L4==1 & L5==1) -> indeed flagged initially by make_strata_table
+
+# essence: both PoRT & kbsd det viol
 
 
 ## KBSD cat ----
@@ -151,7 +133,7 @@ mfv(l_values2)  # least support for IV=1 is for L3="(7,8]" (not expected, not pl
 
 
 # identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 < 7) %>% nrow()
 # q=0.05: 75/87 from critical stratum -> majority of obs reported as critical are from viol stratum!
@@ -177,17 +159,17 @@ sem1 <- DAG.empty() +
   node("A", distr = "rbern", prob = plogis(0.2*L1 + 0.3*L2 + 0.1*L4 + 0.3*L5 - 3*L3))
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 
 # check for extreme probs with cont conf L3:
-data1 %>% filter(L3==1 & A==1) %>% nrow()/data1 %>% filter(L3==1) %>% nrow()  # viol: P(A=1)~0 for g >=1, b>= 0.05, any a as sample prop = 80%
+data1 %>% filter(L3==1 & A==1) %>% nrow()/data1 %>% filter(L3==1) %>% nrow()  # viol: P(A=1)~0 for g >=1, b>= 0.05, any a as sample prop = 80.7%
 
 # check via table for extreme probs for all combos of binary conf: def in setup.R
 binary_vars <- paste0("L", 1:5)
 tab <- make_strata_table(data1, A = "A", binary_vars = binary_vars)
 tab %>% filter((proba_exp <= 0.1 | proba_exp >= 0.9) & sample_prop >= 0.01) %>% print(n = 70)
 # almost all involve L3=1 as wanted
-# 3 others involve L1 = 0 & not L3 at all! (rows 24-27)
+# 8 others do not involve L3 at all!
 
 ## PoRT ----
 source("data/port_utils.R")
@@ -221,39 +203,24 @@ o5_2$A <- 0
 res5 <- kbsd(data = o5,
              int_data_list = list(o5_1, o5_2),
              disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
-                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),  # use 1 sd for L_i, 0.5 sd for A
              plot.out = F)
 res5_plot <- kbsd(data = o5,
                   int_data_list = list(o5_1, o5_2),
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
-                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 sd for L_i, 0.5 sd for A
 res5_plot  # EDP range between 0-200, fewer support for IV=1
 table(data1$A)  # which alr indicated here by fewer obs in A=1
 
-# subgroup L3<4 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]
-diag_values1 <- shift1[outliers1,]
-plot(l_values1, diag_values1$diagnostic)
-# tendency is that L3=1 has fewer values for IV=1 (A=1) bc obs with L3=1 only rarely got A=1!
 
-# also check for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values2 <- data1[outliers2, "L3"]  # original L3 values
-diag_values2 <- shift1[outliers2,] # diag values
-plot(l_values2, diag_values2$diagnostic)
-# not such a clear trend
-
-# essence: both PoRT & kbsd det viol
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.01), "observation"])
+# identify obs with low EDP: subgroup L3<4 with P(A=1)~0 should have few support for IV=1 (A=1)
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.01), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 ==1) %>% nrow()
 # q=0.01 & 0.05: majority of obs reported as critical are from viol stratum
 o5[indices_outliers, ] %>% filter(!(L3 ==1)) # no viol bc strata just consist of 1 obs each
+
+# essence: both PoRT & kbsd det viol
 
 
 
@@ -276,12 +243,12 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 
 plot(density(data1$L3), main = "bimodal L3 distribution from mixture") # again expect viol in [4,6]
 
 # check for extreme probs with cont conf L3:
-data1 %>% filter(L3<4 & A==1) %>% nrow()/data1 %>% filter(L3<4) %>% nrow()  # viol: for g >=1, b>= gruber, a<=0.05 as sample prop = 8.9%
+data1 %>% filter(L3<4 & A==1) %>% nrow()/data1 %>% filter(L3<4) %>% nrow()  # viol: for g >=1, all b, a<=0.05 as sample prop = 8.9%
 
 # check via table for extreme probs for all combos of binary conf: def in setup.R
 binary_vars <- paste0("L", c(1,2,4,5))
@@ -311,8 +278,8 @@ lst5
 
 
 ## PoRT: continuous var L3 categorised ----
-data1_cat <- data1
 source("data/port_utils.R")
+data1_cat <- data1
 data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
 lst5_cat <- list()
 for (g in g_values) {
@@ -341,40 +308,23 @@ o5_2$A <- 0
 res5 <- kbsd(data = o5,
              int_data_list = list(o5_1, o5_2),
              disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
-                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),  # use 1 sd for L_i, 0.5 sd for A
              plot.out = F)
 res5_plot <- kbsd(data = o5,
                   int_data_list = list(o5_1, o5_2),
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
-                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 sd for L_i, 0.5 sd for A
 res5_plot  # EDP range between 0-200, fewer support for IV=2
 
-# subgroup L3<4 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]
-diag_values1 <- shift1[outliers1,]
-plot(l_values1, diag_values1$diagnostic)
-# clear that L3 <4 has fewer EDP as few values for L3<4 with A=1
-
-# also check for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values2 <- data1[outliers2, "L3"]  # original L3 values
-diag_values2 <- shift1[outliers2,] # diag values
-plot(l_values2, diag_values2$diagnostic)
-# looks as for A=1, i.e. indicates fewer support for L3<4, so check:
-data1 %>% filter(L3 < 4 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # no viol actually
-
-# essence: both PoRT & kbsd det viol that was a left side gap, but PoRT was lazy after cat & didn't flag entire stratum anymore
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.01), "observation"])
+# identify obs with low EDP: subgroup L3<4 with P(A=1)~0 should have few support for IV=1 (A=1)
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
-# only for q=0.01: majority of obs reported as critical are from viol stratum
-o5[indices_outliers, ] %>% filter(!(L3 <4)) # interesting that all L4=1
-data1 %>% filter(L1==1 & L2==1 & L4==1 & A==1) %>% nrow()/data1 %>% filter(L1 == 1 & L2==1 & L4==1) %>% nrow()  # but no viol
+
+o5[indices_outliers, ] %>% filter(!(L3 <4)) # interesting that many with L4=1
+data1 %>% filter(L4==1 & A==1) %>% nrow()/data1 %>% filter(L4==1) %>% nrow()  # but no viol
+
+# essence: both PoRT & kbsd det viol that was a left side gap
 
 
 
@@ -401,25 +351,13 @@ res5_plot <- kbsd(data = o5,
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
                                  L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
 res5_plot
-# check what strata have low support for IV=1
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)
-l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
-mfv(l_values1)  # most with few support for IV=1 are from "(6,7]" -> not correct should be <4
-table(l_values1)
-
-# check where few support for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
-l_values2 <- data1_cat[outliers2, "L3"]
-mfv(l_values2)  # again for L3="(6,7]" (not expected, not planned)
 
 # identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
-o5[indices_outliers, ] %>% filter(L3<4) %>% nrow()
+o5[indices_outliers, ] %>% filter(L3<5) %>% nrow()
 # only for q=0.01: majority of obs reported as critical are from viol stratum
-o5[indices_outliers, ] %>% filter(!(L3<4)) # no viol bc strata just consist of 1 obs each
+o5[indices_outliers, ] %>% filter(!(L3<5)) # no viol bc strata just consist of 1 obs each
 
 # essence: with checking for majority of flagged obs, viol stratum not well identified!
 
@@ -442,7 +380,7 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 
 plot(density(data1$L3), main = "bimodal L3 distribution from mixture") # again expect viol in [4,6]
 
@@ -481,8 +419,8 @@ lst5
 
 
 ## PoRT: continuous var L3 categorised ----
-data1_cat <- data1
 source("data/port_utils.R")
+data1_cat <- data1
 data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
 lst5_cat <- list()
 for (g in g_values) {
@@ -522,42 +460,24 @@ o5_2$A <- 0
 res5 <- kbsd(data = o5,
              int_data_list = list(o5_1, o5_2),
              disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
-                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)), 
              plot.out = F)
 res5_plot <- kbsd(data = o5,
                   int_data_list = list(o5_1, o5_2),
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
-                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))  # use 1 SD for L_i, 0.5 SD for A
+                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A))) 
 res5_plot  # EDP range between 0-250, again fewer support for IV=1
 table(data1$A)  # which alr indicated here by fewer obs in A=1
 
-# subgroup L3=(4,6] with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]  # to which original obs (L values) do these outliers belong?
-diag_values1 <- shift1[outliers1,] # what diag values do these outliers have
-plot(l_values1, diag_values1$diagnostic)
-# clearer than in 3 Conf scenario that L3 = [4,6] has fewer EDP than surrounding values
-
-# also check for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values2 <- data1[outliers2, "L3"]  # original L3 values
-diag_values2 <- shift1[outliers2,] # diag values
-plot(l_values2, diag_values2$diagnostic)
-# looks as for A=1, i.e. indicates fewer support for L3 in [4,6], so check:
-data1 %>% filter(L3 < 6 & A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow()
-# but actually many obs among A=0 with such values, also EDP threshold here v low
-# so prob enough support overall (also did not have viol with P(A=0)~0)
-
-# essence: both PoRT and kbsd found the viol of P(A=1|L3 in [4,6])~0
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.01), "observation"])
+# identify obs with low EDP: subgroup L3=(4,6] with P(A=1)~0 should have few support for IV=1 (A=1)
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 >4 & L3 <6) %>% nrow()
 # not even for q=0.01, majority of obs reported as critical are from viol stratum!
 o5[indices_outliers, ] %>% filter(!(L3> 4 & L3 <6))
+
+# essence: PoRT found the viol of P(A=1|L3 in [4,6])~0, kbsd didn't have it as majority among obs with low EDP
+
 
 
 ## KBSD cat ----
@@ -583,20 +503,9 @@ res5_plot <- kbsd(data = o5,
                   disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
                                  L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
 res5_plot
-# check what strata have low support for IV=1
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
-mfv(l_values1)  # most with few support for IV=1 are from "(2,3],(3,4]" -> should be [4,6] tho!
-
-# check where few support for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
-l_values2 <- data1_cat[outliers2, "L3"]
-mfv(l_values2)  # not expected, not planned
 
 # identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.01), "observation"])
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 > 4 & L3 < 6) %>% nrow()
 # q=0.01: only 1 out of 15 obs reported as critical is from viol stratum!?
@@ -618,12 +527,12 @@ sem1 <- DAG.empty() +
 # all conf L_i=1 is v unlikely -> treatment not too likely, too but not extreme either
 dag1 <- set.DAG(sem1)
 plotDAG(dag1)
-data1 <- sim(dag1, n = 1000)
+data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 
 data1$L2 <- data1$L1  # perfect corr between these 2
 
 # check for extreme probs with cont conf L3:
-data1 %>% filter(L3<6 & A==1) %>% nrow()/data1 %>% filter(L3<6) %>% nrow()  # viol: P(A=1)~0 for g >=1, any a & any b as sample prop = 50.8%
+data1 %>% filter(L3<6 & A==1) %>% nrow()/data1 %>% filter(L3<6) %>% nrow()  # viol: P(A=1)~0 for g >=1, any a & any b as sample prop = 52%
 
 # check via table for extreme probs for all combos of binary conf: def in setup.R
 binary_vars <- paste0("L", c(1,2,4,5))
@@ -652,8 +561,8 @@ lst5
 
 
 ## PoRT: continuous var L3 categorised ----
-data1_cat <- data1
 source("data/port_utils.R")
+data1_cat <- data1
 data1_cat$L3 <- cut(data1_cat$L3, breaks = c(-Inf, 1, 2, 3, 4, 5, 6, 7, 8, Inf))
 lst5_cat <- list()
 for (g in g_values) {
@@ -690,33 +599,15 @@ res5_plot <- kbsd(data = o5,
 res5_plot  # EDP range between 0-350, fewer support for IV=1
 table(data1$A)  # which alr indicated here by fewer obs in A=1
 
-# subgroup L3<6 with P(A=1)~0 should have few support for IV=1 (A=1) if would estimate Y|A=1 further
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = .25)  # create indices for the "outliers"
-l_values1 <- data1[outliers1, "L3"]
-diag_values1 <- shift1[outliers1,]
-plot(l_values1, diag_values1$diagnostic)
-# v similar to uncorrelated scenario: most obs with low EDP points stem from side where L3 <6 -> bc few values for L3<4 with A=1
-
-# also check for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values2 <- data1[outliers2, "L3"]  # original L3 values
-diag_values2 <- shift1[outliers2,] # diag values
-plot(l_values2, diag_values2$diagnostic)
-# overall higher EDP values than for A=1 bc more support here
-# but also indicates fewer support for L3<6, so check:
-data1 %>% filter(L3 < 6& A==0) %>% nrow()/data1 %>% filter(L3 < 6) %>% nrow() # no viol actually, all obs with L3<6 are in A=0!
+# identify obs with low EDP: subgroup L3<6 with P(A=1)~0 should have few support for IV=1 (A=1)
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L3 <6) %>% nrow()
+# q=0.01 & 0.05: majority of obs reported as critical are from viol stratum
 
 # essence: both PoRT & kbsd det viol & for PoRT, the induced correlation here between the other vars 
 # not involved in viol did not impact detection (as it did in 10 Conf scenario, but then again
 # in 10 Conf scenario the problem with nondetection alr existed for uncorr setting so rather dimensionality problem?)
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
-o5[indices_outliers, ] %>% nrow()
-o5[indices_outliers, ] %>% filter(L3 <6) %>% nrow()
-# q=0.01 & 0.05: majority of obs reported as critical are from viol stratum
 
 
 
@@ -735,31 +626,21 @@ o5_2 <- o5
 o5_2$A <- 0
 res5 <- kbsd(data = o5,
              int_data_list = list(o5_1, o5_2),
-             disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3), 
-                            L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)),
+             disthalf_vec=c(L1=0.5*sd(o5$L1), L2 = 0.5*sd(o5$L2), L3=0.5*sd(o5$L3), 
+                            L4 = 0.5*sd(o5$L4), L5 = 0.5*sd(o5$L5), A=0.5*0.5*sd(o5$A)),
              plot.out = F)
 res5_plot <- kbsd(data = o5,
                   int_data_list = list(o5_1, o5_2),
-                  disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3=sd(o5$L3),
-                                 L4 = sd(o5$L4), L5 = sd(o5$L5), A=0.5*sd(o5$A)))
+                  disthalf_vec=c(L1=0.5*sd(o5$L1), L2 = 0.5*sd(o5$L2), L3=0.5*sd(o5$L3),
+                                 L4 = 0.5*sd(o5$L4), L5 = 0.5*sd(o5$L5), A=0.5*0.5*sd(o5$A)))
 res5_plot
-# check what strata have low support for IV=1
-shift1 <- res5[res5$shift == 1,]
-outliers1 <- shift1$diagnostic < quantile(shift1$diagnostic, probs = 0.25)  # create indices for the "outliers"
-l_values1 <- data1_cat[outliers1, "L3"]   # original cat L3 values
-table(l_values1)  # most with few support for IV=1 are from "(4,5]" -> poss bc viol for <6!
 
-# check where few support for IV=2 (A=0)
-shift2 <- res5[res5$shift == 2,]
-outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
-l_values2 <- data1_cat[outliers2, "L3"]
-mfv(l_values2)  # not expected, not planned
-
-# identify obs with low EDP
-indices_outliers <- unique(res5[res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
+# identify obs with low EDP: should be for L3<7
+indices_outliers <- unique(res5[res5$shift == 1 & res5$diagnostic < quantile(res5$diagnostic, 0.05), "observation"])
 o5[indices_outliers, ] %>% nrow()
 o5[indices_outliers, ] %>% filter(L3 <7) %>% nrow()
 # q=0.01 & 0.05: majority of obs reported as critical are from viol stratum
+o5[indices_outliers, ] %>% filter(!L3 <7)
 
 # essence: majority of those with few EDP are indeed obs from the viol stratum!
 
