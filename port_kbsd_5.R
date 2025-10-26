@@ -385,8 +385,8 @@ data1 <- sim(dag1, n = 1000, rndseed = 28092025)
 plot(density(data1$L3), main = "bimodal L3 distribution from mixture") # again expect viol in [4,6]
 
 # check for extreme probs with cont conf L3:
-data1 %>% filter(L3 >= 4 & L3 <= 6 & A==1) %>% nrow()/
-  data1 %>% filter(L3 >= 4 & L3 <= 6) %>% nrow()  # viol #1: P(A=1)~0, sample prop = 15.2% -> should find for g>=1, b=0.1, any a
+data1 %>% filter(L3 > 4 & L3 < 6 & A==1) %>% nrow()/
+  data1 %>% filter(L3 > 4 & L3 < 6) %>% nrow()  # viol #1: P(A=1)~0, sample prop = 15.2% -> should find for g>=1, b=0.1, any a
 # often in combo with L1=0/L2=0 (<- can be considered subviolations of viol #1)
 
 # check via table for extreme probs for all combos of binary conf: def in setup.R

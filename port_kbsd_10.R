@@ -130,7 +130,13 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
-# identify what points have low support, with cat data!
+# identify obs with low EDP
+indices_outliers <- unique(res5[res5$shift == 2 & res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+# q=0.05: most not from ciritcal stratum...
+o5[indices_outliers, ] %>% filter(!(L6==1 & L7==1 & L8==1))
+
 
 # essence: PoRT directly returns strata (can check if sensible in context -> don't need to know viol in advance),
 #          for kbsd you should know where to look for viol, else explorative by tracing back the strata (good for overview tho)
@@ -158,11 +164,6 @@ res5_plot
 
 # over all disthalf_vec specifications: same general trend with better support for IV=1, but EDP values quite diff
 
-
-# prob similar results as for other metrics/plots
-mad(o5$A)  # mad unsuitable
-IQR(o5$A)  # IQR ok here, treatment distr not as imbalanced as in 2 Conf setting
-summary(o5$A)
 
 
 ### formula for EDP for high-dim covar set ----
@@ -194,7 +195,7 @@ res5_hm_plot <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmon
                      L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                      A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
                      plot.out = T)
-#ggsave("kbsd_10_hm.png", width = 6, height = 3)
+#ggsave("kbsd_10_hm_uncat.png", width = 6, height = 3)
 
 #### essence: same trend, but much higher discrepancy between EDP ranges of the two IV types: IV=1 is 20 EDPs higher than IV=2 ----
 
@@ -204,7 +205,15 @@ res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmea
                                     L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
                                     A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
                      plot.out = F)
-#sink("kbsd_10_hm.txt")
+#saveRDS(res5_hm, file = "hm_10_uncat_uncorr.RDS")
+
+# identify obs with low EDP
+indices_outliers <- unique(res5_hm[res5_hm$shift == 2 & res5_hm$diagnostic < quantile(res5_hm[res5_hm$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+# q=0.01, 0.05, 0.25: most not from ciritcal stratum...
+o5[indices_outliers, ] %>% filter(!(L6==1 & L7==1 & L8==1))
+
 
 
 ## KBSD cat ----
@@ -250,18 +259,6 @@ table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from 
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
-
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] # exploratively -> v diff now to do manually 
-
-indices_outliers0 <- unique(res5[res5$shift == 2 & 
-                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers0, ] %>% nrow()
-o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # majority det as from the critical stratum
-o5[indices_outliers0, ] %>% filter(!(L6==1 & L7==1 & L8==1))  # 21 remaining obs -> also diff to recognise strata manually
-
 
 # essence: both for uncat & for cat data, kbsd correctly flagged the critical stratum as with low EDP
 
@@ -368,20 +365,22 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
-
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] # exploratively -> v diff now to do manually 
-
-indices_outliers0 <- unique(res5[res5$shift == 2 & 
-                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers0, ] %>% nrow()
-o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()  # majority det as from the critical stratum
-o5[indices_outliers0, ] %>% filter(!(L6==1 & L7==1 & L8==1))  # 5 remaining obs -> also diff to recognise strata manually
-
-
 # essence: PoRT & kbsd detected viol -> binary case seems v agréable for both diags
+
+# kbsd with hm variant
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                plot.out = T)
+#ggsave("bp10_hm_binary.png", width=2.5, height=6)
+#saveRDS(res5_hm, file = "hm_10_binary.RDS")
+# identify obs with low EDP
+indices_outliers <- unique(res5_hm[res5_hm$shift == 2 & res5_hm$diagnostic < quantile(res5_hm[res5_hm$shift ==2, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+# q=0.01, 0.05, 0.25: most not from ciritcal stratum...
+o5[indices_outliers, ] %>% filter(!(L6==1 & L7==1 & L8==1))
 
 
 
@@ -516,14 +515,25 @@ for (i in names(o5)[-11]) {
 # no real pattern: makes sense that support for A=0 is fine among L3<4 bc most in this stratum got A=0!
 # worse for quantile = 0.5 than for 0.25 bc just overall fewer obs with L3<4 (see sim with low density on left)
 
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] %>% nrow() # exploratively
-o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
-
 # essence: PoRT det viol both in uncat & cat data, tho cat is nicer to interpret if precise enough as here
 #          kbsd could not pinpoint that underlying the low EDP there is our viol stratum, tho detection dep on choice of EDP threshold (quantile)..
+
+
+# kbsd hm
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                plot.out = T)
+#ggsave("bp10_hm_uncat_int.png", width=2.5, height=6)
+#saveRDS(res5_hm, file = "hm_10_uncat_external.RDS")
+# identify obs with low EDP
+indices_outliers <- unique(res5_hm[res5_hm$shift == 1 & res5_hm$diagnostic < quantile(res5_hm[res5_hm$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
+# q=0.01, 0.05, 0.25: most not from ciritcal stratum...
+o5[indices_outliers, ] %>% filter(!L3 <4)
+
 
 
 ## KBSD cat ----
@@ -565,11 +575,6 @@ outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
 l_values2 <- data1_cat[outliers2, "L3"]
 mfv(l_values2)  # not expected, not planned
 
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] %>% nrow() # exploratively
-o5[indices_outliers, ] %>% filter(L3 <4) %>% nrow()
 
 
 
@@ -696,11 +701,23 @@ plot(l_values2, diag_values2$diagnostic)  # no low EDP for L3~5 at all, bc all w
 # the more in center, the higher the support, except between 4-6 rarer
 # also, overall v low EDP due to high dim, so try alternative EDP formulas below
 
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] %>% nrow() # exploratively
-o5[indices_outliers, ] %>% filter(L3 > 3 & L3 < 6) %>% nrow()
+
+# kbsd hm
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                plot.out = T)
+#ggsave("bp10_uncat_ext.png", width=2.5, height=6)
+#saveRDS(res5_hm, file = "hm_10_uncat_internal.RDS")
+# identify obs with low EDP
+indices_outliers <- unique(res5_hm[res5_hm$shift == 1 & res5_hm$diagnostic < quantile(res5_hm[res5_hm$shift ==1, "diagnostic"], 0.05), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L3 >4 & L3 < 6) %>% nrow()
+# q=0.01, 0.05, 0.25: most not from critical stratum...
+o5[indices_outliers, ] %>% filter(!(L3 >4 & L3 < 6))
+
+
 
 
 ## KBSD cat ----
@@ -742,16 +759,6 @@ outliers2 <- shift2$diagnostic < quantile(shift2$diagnostic, probs = 0.25)
 l_values2 <- data1_cat[outliers2, "L3"]
 mfv(l_values2)  # (2,3] not expected, not planned as critical obs for A=0
 
-
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] %>% nrow() # exploratively
-o5[indices_outliers, ] %>% filter(L3 > 3 & L3 < 6) %>% nrow()
-
-indices_outliers0 <- unique(res5[res5$shift == 2 & 
-                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers0, ]
 
 
 
@@ -878,18 +885,22 @@ table(o5[subset_5_1$observation, c("L9", "L10")])
 subset_5_2 <- res5[res5$diagnostic < quantile(res5[res5$shift == 2, "diagnostic"], 0.25) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
 
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] # exploratively
-
-indices_outliers0 <- unique(res5[res5$shift == 2 & 
-                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers0, ] %>% nrow()
-o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
-
-
 # essence: both diags det viol, although PoRT fails for smaller a, b values
+
+
+# kbsd hm
+res5_hm <- kbsd(data = o5, int_data_list = list(o5_1, o5_2), type = "harmonicmean",
+                disthalf_vec=c(L1=sd(o5$L1), L2 = sd(o5$L2), L3 = sd(o5$L3), L4 = sd(o5$L4), L5 = sd(o5$L5),
+                               L6 = sd(o5$L6), L7 = sd(o5$L7), L8 = sd(o5$L8), L9 = sd(o5$L9), L10 = sd(o5$L10),
+                               A=0.5*sd(o5$A)),  # use 1 SD for L_i, 0.5 SD for A
+                plot.out = F)
+#saveRDS(res5_hm, file = "hm_10_uncat_corr.RDS")
+# identify obs with low EDP
+indices_outliers <- unique(res5_hm[res5_hm$shift == 2 & res5_hm$diagnostic < quantile(res5_hm[res5_hm$shift ==2, "diagnostic"], 0.25), "observation"])
+o5[indices_outliers, ] %>% nrow()
+o5[indices_outliers, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
+# q=0.01, 0.05, 0.25: 1/10, 9/50, 44/250
+
 
 
 ## KBSD cat ----
@@ -929,17 +940,5 @@ table(o5[subset_5_1$observation, c("L9", "L10")]) # no viol expected; most from 
 # what strata are those with low support for treated (IV = 0): should be L8=1 & L6=1 & L7=1
 subset_5_2 <- res5[res5$diagnostic < median(res5[res5$shift == 2, "diagnostic"]) & res5$shift == 2,]
 table(o5[subset_5_2$observation, ][, c("L6", "L7", "L8")]) # highest count among IV=0 is L8=1 & L6=1 & L7=1 -> as expected
-
-
-# identify obs with few support
-indices_outliers <- unique(res5[res5$shift == 1 & 
-                                  res5$diagnostic < quantile(res5[res5$shift ==1, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers, ] # exploratively
-
-indices_outliers0 <- unique(res5[res5$shift == 2 & 
-                                   res5$diagnostic < quantile(res5[res5$shift ==2, "diagnostic"], 0.05), "observation"])
-o5[indices_outliers0, ] %>% nrow()
-o5[indices_outliers0, ] %>% filter(L6==1 & L7==1 & L8==1) %>% nrow()
-
 
 # essence: kbsd also identified the viol with cat data
