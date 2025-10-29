@@ -87,7 +87,7 @@ art %>% filter(TimeHIVToEnrol==3 & SAMEDAY==1) %>% nrow()/art %>% filter(TimeHIV
 art %>% filter(sex=="pregnant" & SAMEDAY==1) %>% nrow()/art %>% filter(sex=="pregnant") %>% nrow()
 art %>% filter(facility %in% c("12-Dwaleni", "13-Gege" ,"14-Magubheleni", "15-Mahlandle",
                                "16-Mashobeni", "17-SOS", "18-Tfokotani", "19-Zombodze") & SAMEDAY==1) %>% nrow()/
-  art %>% filter(facility %in% c("12-Dwaleni", "13-Gege" ,"14-Magubheleni", "15-Mahlandle",
+art %>% filter(facility %in% c("12-Dwaleni", "13-Gege" ,"14-Magubheleni", "15-Mahlandle",
                                  "16-Mashobeni", "17-SOS", "18-Tfokotani", "19-Zombodze")) %>% nrow()
 # indeed higher probs of same-day AR for these predictors, but not that extreme that could be considered as pos viol P(A=0|L)
 
@@ -319,8 +319,7 @@ res_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
 #ggsave("output_kbsd_new.png", width = 8, height = 6)
-# order of specifying values in disthalf_Vec changes EDP results/BP??~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# does order in disthalf_vec have to be equal to col order in o1/o2?
+# order in disthalf_vec has to be equal to col order in o1/o2?
 
 # overall v few EDP bc 16 confounders <=> 16 dimensions
 # fewer support for early ART than for same-day 
@@ -353,6 +352,8 @@ art_num[outliers_ind1,] %>% filter(facility %in% 11) %>% nrow()  # q=0.05: 43(ma
 art_num[outliers_ind1,] %>% select(TimeHIVToEnrol) %>% table()  # q=0.05: most from 1-89d 
 art_num[outliers_ind1,] %>% select(tb) %>% table()
 
+art_num[outliers_ind1,] %>% filter(facility == 11 & sex == 0)
+
 
 # what obs/strata have few support in IV=2 (A=0) ---
 shift2 <- res[res$shift==2,]
@@ -382,23 +383,7 @@ art_num[outliers_ind2,] %>% filter(facility %in% 12:19) %>% nrow()  # q=0.05: 57
 art_num[outliers_ind2,] %>% select(TimeHIVToEnrol) %>% table()  # q=0.05: most from <90d
 art_num[outliers_ind2,] %>% select(sex) %>% table()
 
-# identify manually what strata the obs with few EDP belong to
-indices_outliers <- unique(res[res$shift == 1 & 
-                                  res$diagnostic < quantile(res[res$shift ==1, "diagnostic"], 0.05), "observation"])
-art_num[indices_outliers, ] %>% nrow() # exploratively
-
-for (i in names(art_num)[-17]) {
-  print(i)
-  print(table(art_num[indices_outliers, i])/nrow(art_num[indices_outliers, ]), end="\n\n")
-}
-indices_outliers0 <- unique(res[res$shift == 2 & 
-                                   res$diagnostic < quantile(res[res$shift ==2, "diagnostic"], 0.05), "observation"])
-art_num[indices_outliers0, ] %>% nrow()
-for (i in names(art_num)[-17]) {
-  print(i)
-  print(table(art_num[indices_outliers0, i])/nrow(art_num[indices_outliers, ]), end="\n\n")
-}
-
+art_num[outliers_ind2,] %>% filter(facility != 11 & underTreatAll==1)
 
 
 # essence: obs that got early ART/A=0 most rarely of all cat (det bc few obs with similar covar vals were found), are

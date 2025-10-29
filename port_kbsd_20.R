@@ -230,8 +230,9 @@ res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), type = "harmonicmean",
                             L11=sd(o1$L11), L12 = sd(o1$L12), L13 = sd(o1$L13), L14 = sd(o1$L14), L15 = sd(o1$L15),
                             L16 = sd(o1$L16), L17 = sd(o1$L17), L18 = sd(o1$L18), L19 = sd(o1$L19), L20 = sd(o1$L20),
                             A=0.5*sd(o1$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
-#saveRDS(res1, "hm_20_cat_uncorr.RDS")
+             plot.out = T)
+ggsave("bp20_hm_cat_uncorr.png", width = 2.5, height = 6)
+#saveRDS(res1, "bp20_hm_cat_uncorr.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res1[res1$shift == 2 & res1$diagnostic < quantile(res1[res1$shift == 2, "diagnostic"], 0.05), "observation"])
 o1[outliers_ind0,] %>% nrow()
@@ -323,7 +324,7 @@ lst2
 
 dat2_cat <- dat2
 for (i in names(dat2)[1:10]) {
-  dat2_cat[[i]] <- cut(dat2[[i]], breaks = c(-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
+  dat2_cat[[i]] <- cut(dat2[[i]], breaks = c(-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
 }
 dat2_cat
 g_values <- 1:5
@@ -411,12 +412,13 @@ table(dat2_cat$L2)  # all have same categorisation -> give numerical repr to com
 dat2_cat <- dat2_cat %>%
   mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
                 ~ case_when(
-                  . == "(-3,-2]" ~ 1, . == "(-2,-1]"    ~ 2, . == "(-1,0]"    ~ 3,
-                  . == "(0,1]"     ~ 4, . == "(1,2]"     ~ 5, . == "(2,3]"     ~ 6,
-                  . == "(3,4]"     ~ 7, . == "(4,5]"     ~ 8, . == "(5,6]"     ~ 9,
-                  . == "(6,7]"     ~ 10, . == "(7,8]"    ~ 11, . == "(8,9]"  ~ 12,
-                  . == "(9,10]"     ~ 13, . == "(10,11]"    ~ 13, . == "(11,12]"  ~ 15,
-                  . == "(12,13]"    ~ 16, . == "(13,14]"  ~ 17)))
+                  . == "(-6,-5]" ~ 1, . == "(-5,-4]"    ~ 2, . == "(-4,-3]"    ~ 3,
+                  . == "(-3,-2]" ~ 4, . == "(-2,-1]"    ~ 5, . == "(-1,0]"    ~ 6,
+                  . == "(0,1]"     ~ 7, . == "(1,2]"     ~ 8, . == "(2,3]"     ~ 9,
+                  . == "(3,4]"     ~ 10, . == "(4,5]"     ~ 11, . == "(5,6]"  ~ 12,
+                  . == "(6,7]"     ~ 13, . == "(7,8]"    ~ 14, . == "(8,9]"  ~ 15,
+                  . == "(9,10]"     ~ 16, . == "(10,11]"    ~ 17, . == "(11,12]"  ~ 18,
+                  . == "(12,13]"    ~ 19, . == "(13,14]"  ~ 20)))
 source("kbsd.R")
 o2 <- dat2_cat
 o2_1 <- o2
@@ -463,7 +465,8 @@ res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), type = "harmonicmean",
                             L11=sd(o2$L11), L12 = sd(o2$L12), L13 = sd(o2$L13), L14 = sd(o2$L14), L15 = sd(o2$L15),
                             L16 = sd(o2$L16), L17 = sd(o2$L17), L18 = sd(o2$L18), L19 = sd(o2$L19), L20 = sd(o2$L20),
                             A=0.5*sd(o2$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
+             plot.out = T)
+#ggsave("bp20_hm_cat_corr.png", width = 2.5, height = 6)
 #saveRDS(res2, "hm_20_cat_corr.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res2[res2$shift == 2 & res2$diagnostic < quantile(res2[res2$shift == 2, "diagnostic"], 0.05), "observation"])
@@ -505,8 +508,8 @@ DAG3 <- set.DAG(DAG3)
 dat3 <- sim(DAG3, rndseed = 12082025, n = 1000)[-1]
 table(dat3$A)  # balanced
 
-dat3 %>% filter(L5 >= 4 & L5 <= 6 & A==1) %>% nrow()/
-  dat3 %>% filter(L5 >= 4 & L5 <= 6) %>% nrow()  # P(A=1)~0 -> to be det for g>=1, any b & any a (sample prop= 17%)
+dat3 %>% filter(L5 > 4 & L5 <6 & A==1) %>% nrow()/
+  dat3 %>% filter(L5 > 4 & L5 <6) %>% nrow()  # P(A=1)~0 -> to be det for g>=1, any b & any a (sample prop= 17%)
 
 # table to check for all combos of binary conf if there are any with extreme P(A): fun defined in setup.R
 binary_vars <- paste0("L", c(6:10))
@@ -694,12 +697,13 @@ res3 <- kbsd(data = o3, int_data_list = list(o3_1, o3_2), type = "harmonicmean",
                             L11=sd(o3$L11), L12 = sd(o3$L12), L13 = sd(o3$L13), L14 = sd(o3$L14), L15 = sd(o3$L15),
                             L16 = sd(o3$L16), L17 = sd(o3$L17), L18 = sd(o3$L18), L19 = sd(o3$L19), L20 = sd(o3$L20),
                             A=0.5*sd(o3$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
-#saveRDS(res3, "hm_20_cat_int.RDS")
+             plot.out = T)
+#ggsave("bp_20_hm_cat_int.png", width = 2.5, height = 6)
+#saveRDS(res3, "")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
-outliers_ind0 <- unique(res3[res3$shift == 2 & res3$diagnostic < quantile(res3[res3$shift == 2, "diagnostic"], 0.05), "observation"])
+outliers_ind0 <- unique(res3[res3$shift == 1 & res3$diagnostic < quantile(res3[res3$shift == 1, "diagnostic"], 0.05), "observation"])
 o3[outliers_ind0,] %>% nrow()
-o3[outliers_ind0,] %>% filter(L19==1 & L20==1) %>% nrow()  # majority of outliers are from critical stratum
+o3[outliers_ind0,] %>% filter(L5 > 7 & L5 < 10) %>% nrow()  # majority of outliers are from critical stratum
 
 
 
@@ -863,7 +867,7 @@ o4[outliers_ind0,] %>% filter(L5 <4) %>% nrow()  # majority of outliers are from
 
 
 ## KBSD cat ----
-table(dat4_cat$L1)
+table(dat4_cat$L2)
 table(dat4_cat$L9)  # all have same categorisation -> give numerical repr to compute kbsd values
 dat4_cat <- dat4_cat %>%
   mutate(across(all_of(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10")), 
@@ -919,12 +923,13 @@ res4 <- kbsd(data = o4, int_data_list = list(o4_1, o4_2), type = "harmonicmean",
                             L11=sd(o4$L11), L12 = sd(o4$L12), L13 = sd(o4$L13), L14 = sd(o4$L14), L15 = sd(o4$L15),
                             L16 = sd(o4$L16), L17 = sd(o4$L17), L18 = sd(o4$L18), L19 = sd(o4$L19), L20 = sd(o4$L20),
                             A=0.5*sd(o4$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
-#saveRDS(res4, "hm_20_cat_ext.RDS")
+             plot.out = T)
+#ggsave("bp20_hm_cat_ext.png", width = 2.5, height = 6)
+#saveRDS(res4, "")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
-outliers_ind0 <- unique(res4[res4$shift == 2 & res4$diagnostic < quantile(res4[res4$shift == 2, "diagnostic"], 0.05), "observation"])
+outliers_ind0 <- unique(res4[res4$shift == 1 & res4$diagnostic < quantile(res4[res4$shift == 1, "diagnostic"], 0.05), "observation"])
 o4[outliers_ind0,] %>% nrow()
-o4[outliers_ind0,] %>% filter(L19==1 & L20==1) %>% nrow()  # majority of outliers are from critical stratum
+o4[outliers_ind0,] %>% filter(L5 <8) %>% nrow()  # majority of outliers are from critical stratum
 
 
 
