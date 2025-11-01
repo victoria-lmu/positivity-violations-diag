@@ -170,7 +170,8 @@ res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), type = "harmonicmean",
                             L11=sd(o1$L11), L12 = sd(o1$L12), L13 = sd(o1$L13), L14 = sd(o1$L14), L15 = sd(o1$L15),
                             L16 = sd(o1$L16), L17 = sd(o1$L17), L18 = sd(o1$L18), L19 = sd(o1$L19), L20 = sd(o1$L20),
                             A=0.5*sd(o1$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
+             plot.out = T)
+#ggsave("bp20_hm_uncat_uncorr.png", width = 2.5, height = 6)
 #saveRDS(res1, "hm_20_uncat_uncorr.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res1[res1$shift == 2 & res1$diagnostic < quantile(res1[res1$shift == 2, "diagnostic"], 0.05), "observation"])
@@ -396,7 +397,8 @@ res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), type = "harmonicmean",
                             L11=sd(o2$L11), L12 = sd(o2$L12), L13 = sd(o2$L13), L14 = sd(o2$L14), L15 = sd(o2$L15),
                             L16 = sd(o2$L16), L17 = sd(o2$L17), L18 = sd(o2$L18), L19 = sd(o2$L19), L20 = sd(o2$L20),
                             A=0.5*sd(o2$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = F)
+             plot.out = T)
+#ggsave("bp20_hm_uncat_corr.png", width = 2.5, height = 6)
 #saveRDS(res2, "hm_20_uncat_corr.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res2[res2$shift == 2 & res2$diagnostic < quantile(res2[res2$shift == 2, "diagnostic"], 0.05), "observation"])
