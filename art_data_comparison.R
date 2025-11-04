@@ -318,7 +318,7 @@ res_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("output_kbsd_new.png", width = 8, height = 6)
+#ggsave("art_bp.png", width = 5, height = 6)
 # order in disthalf_vec has to be equal to col order in o1/o2?
 
 # overall v few EDP bc 16 confounders <=> 16 dimensions
@@ -394,17 +394,52 @@ art_num[outliers_ind2,] %>% filter(facility != 11 & underTreatAll==1)
 #          under treat all policy, first clinical stage, without tb, with phone
 
 
+## KBSD with categorised cont confounders ----
 
-# look at obs/strata that have high EDP!! means they're v likely to receive A=0/A=1/both treatment levels ---
-shift1 <- res[res$shift==1,]
-outliers_ind1 <- shift1$diagnostic > quantile(shift1$diagnostic, 0.95)  # indices of obs with few support
-outliers_val1 <- shift1[shift1$diagnostic > quantile(shift1$diagnostic, 0.95), "diagnostic"]  # diag values of obs with few support
-for (i in names(art_num)[-17]) {
-  print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
-}
-# those v likely to have sameday ART/A=1 are pregnant women -> makes sense bc therapy most urgent for them
-table(art$facility, art$SAMEDAY)  # note that overall most obs from fac=11, so that plausible that obs from there
-# have few support in A=1 (in combo with covars xy) but also high support in A=1 (in combo with covars vw)
+art_num$cd4 <- cut(art_num$cd4, breaks = c(-Inf, 100, 200, 350, 500, Inf))
+art_num$bmi <- cut(art_num$bmi, breaks = c(0, 18.5, 25, Inf), right = F)
+art_num$hb <- cut(art_num$hb, breaks = c(0, 9.5, Inf))  # cat in middle of [9,10] to be exhaustive, but in paper not exhaustive (<=9, >=10)
+art_num$alt <- cut(art_num$alt, breaks = c(0, 42.5, Inf))  # same here
+art_num$creat <- cut(art_num$creat, breaks = c(0, 120, Inf))
+art_num
+
+art_num <- art_num %>%
+  mutate(cd4 = case_when(cd4 == "(-Inf,100]" ~ 1, cd4 == "(100,200]" ~ 2,
+                         cd4 == "(200,350]" ~ 3, cd4 == "(350,500]" ~ 4,
+                         cd4 == "(500, Inf]" ~ 5))
+art_num <- art_num %>%
+  mutate(bmi = case_when(bmi == "[0,18.5)" ~ 1, bmi == "[18.5,25)" ~ 2,
+                         bmi == "[25,Inf)" ~ 3))
+art_num <- art_num %>%
+  mutate(hb = case_when(hb == "(0,9.5]" ~ 0, hb == "(9.5,Inf]" ~ 1))
+art_num <- art_num %>%
+  mutate(alt = case_when(alt == "(0,42.5]" ~ 0, alt == "(42.5,Inf]" ~ 1))
+art_num <- art_num %>%
+  mutate(creat = case_when(creat == "(0,120]" ~ 0, creat == "(120,Inf]" ~ 1))
+
+any(is.na(art_num))
+
+o1 <- art_num %>% mutate(SAMEDAY=1) %>%
+  select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
+o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
+  select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
+res_hm_cat <- kbsd(data = art_num, int_data_list = list(o1, o2),
+                   disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
+                                    age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
+                                    tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
+                                    marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
+                                    education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
+                                    hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
+#saveRDS(res_hm_cat, "output_kbsd_cat.RDS")
+res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2),
+                    disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
+                                     age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
+                                     tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
+                                     marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
+                                     education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
+                                     hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
+#ggsave("art_bp_cat.png", width = 5, height = 6)
+
 
 
 ## KBSD harmonic mean ----
@@ -428,7 +463,7 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("output_kbsd_hm_new.png", width = 8, height = 6)
+#ggsave("art_bp_hm_no_fac16.png", width = 5, height = 6)
 
 # double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 shift1 <- res_hm[res_hm$shift==1,]
@@ -457,3 +492,28 @@ for (i in names(art_num)[-17]) {
 r <- (res_plot + ylab("Effective Data Points (EDP)") + ylim(0,10) )| 
   (res_hm_plot + ylab("Effective Data Points (EDP)") + ylim(0,250))
 #ggsave("output_kbsd_both.png")
+
+
+
+## KBSD hm with categorised continuous confounders (cd4, bmi, hb, alt, creat) ----
+
+o1 <- art_num %>% mutate(SAMEDAY=1) %>%
+  select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
+o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
+  select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
+res_hm_cat <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmean",
+               disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
+                                age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
+                                tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
+                                marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
+                                education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
+                                hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
+#saveRDS(res_hm_cat, "output_kbsd_hm_cat.RDS")
+res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmonicmean",
+                    disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
+                                     age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
+                                     tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
+                                     marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
+                                     education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
+                                     hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
+#ggsave("art_bp_hm_cat.png", width = 5, height = 6)
