@@ -165,14 +165,14 @@ res1_plot <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), type = "harmonicm
                             L16 = sd(o1$L16), L17 = sd(o1$L17), L18 = sd(o1$L18), L19 = sd(o1$L19), L20 = sd(o1$L20),
                             A=0.5*sd(o1$A)))
 res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o1$L1), L2 = sd(o1$L2), L3 = sd(o1$L3), L4 = sd(o1$L4), L5 = sd(o1$L5),
-                            L6 = sd(o1$L6), L7 = sd(o1$L7), L8 = sd(o1$L8), L9 = sd(o1$L9), L10 = sd(o1$L10),
-                            L11=sd(o1$L11), L12 = sd(o1$L12), L13 = sd(o1$L13), L14 = sd(o1$L14), L15 = sd(o1$L15),
-                            L16 = sd(o1$L16), L17 = sd(o1$L17), L18 = sd(o1$L18), L19 = sd(o1$L19), L20 = sd(o1$L20),
-                            A=0.5*sd(o1$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o1$L1), L2 = 2*sd(o1$L2), L3 = 2*sd(o1$L3), L4 = 2*sd(o1$L4), L5 = 2*sd(o1$L5),
+                            L6 = 2*sd(o1$L6), L7 = 2*sd(o1$L7), L8 = 2*sd(o1$L8), L9 = 2*sd(o1$L9), L10 = 2*sd(o1$L10),
+                            L11=2*sd(o1$L11), L12 = 2*sd(o1$L12), L13 = 2*sd(o1$L13), L14 = 2*sd(o1$L14), L15 = 2*sd(o1$L15),
+                            L16 = 2*sd(o1$L16), L17 = 2*sd(o1$L17), L18 = 2*sd(o1$L18), L19 = 2*sd(o1$L19), L20 = 2*sd(o1$L20),
+                            A=0.5*2*sd(o1$A)),  # use 1 SD for L_i, 0.5 SD for A
+             plot.out = F)
 #ggsave("bp20_hm_uncat_uncorr.png", width = 2.5, height = 6)
-#saveRDS(res1, "hm_20_uncat_uncorr.RDS")
+#saveRDS(res1, "hm_20_uncat_uncorr_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res1[res1$shift == 2 & res1$diagnostic < quantile(res1[res1$shift == 2, "diagnostic"], 0.05), "observation"])
 o1[outliers_ind0,] %>% nrow()
@@ -224,16 +224,16 @@ o1[outliers_ind0,] %>% filter(L19==1 & L20==1) %>% nrow()  # still majority of o
 
 # essence: kbsd det viol also for cat data
 
-# hm
+## kbsd hm best case kernel steepness ! ----
 res1 <- kbsd(data = o1, int_data_list = list(o1_1, o1_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o1$L1), L2 = sd(o1$L2), L3 = sd(o1$L3), L4 = sd(o1$L4), L5 = sd(o1$L5),
-                            L6 = sd(o1$L6), L7 = sd(o1$L7), L8 = sd(o1$L8), L9 = sd(o1$L9), L10 = sd(o1$L10),
-                            L11=sd(o1$L11), L12 = sd(o1$L12), L13 = sd(o1$L13), L14 = sd(o1$L14), L15 = sd(o1$L15),
-                            L16 = sd(o1$L16), L17 = sd(o1$L17), L18 = sd(o1$L18), L19 = sd(o1$L19), L20 = sd(o1$L20),
-                            A=0.5*sd(o1$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
-ggsave("bp20_hm_cat_uncorr.png", width = 2.5, height = 6)
-#saveRDS(res1, "bp20_hm_cat_uncorr.RDS")
+             disthalf_vec=c(L1=2*sd(o1$L1), L2 = 2*sd(o1$L2), L3 = 2*sd(o1$L3), L4 = 2*sd(o1$L4), L5 = 2*sd(o1$L5),
+                            L6 = 2*sd(o1$L6), L7 = 2*sd(o1$L7), L8 = 2*sd(o1$L8), L9 = 2*sd(o1$L9), L10 = 2*sd(o1$L10),
+                            L11=2*sd(o1$L11), L12 = 2*sd(o1$L12), L13 = 2*sd(o1$L13), L14 = 2*sd(o1$L14), L15 = 2*sd(o1$L15),
+                            L16 = 2*sd(o1$L16), L17 = 2*sd(o1$L17), L18 = 2*sd(o1$L18), L19 = 2*sd(o1$L19), L20 = 2*sd(o1$L20),
+                            A=0.5*2*sd(o1$A)),
+             plot.out = F)
+#ggsave("bp20_hm_cat_uncorr.png", width = 2.5, height = 6)
+#saveRDS(res1, "bp20_hm_cat_uncorr_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res1[res1$shift == 2 & res1$diagnostic < quantile(res1[res1$shift == 2, "diagnostic"], 0.05), "observation"])
 o1[outliers_ind0,] %>% nrow()
@@ -392,14 +392,14 @@ o2[outliers_ind0,] %>% filter(L19==1 & L20==1) %>% nrow()  # as for uncorr: majo
 
 # hm 
 res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o2$L1), L2 = sd(o2$L2), L3 = sd(o2$L3), L4 = sd(o2$L4), L5 = sd(o2$L5),
-                            L6 = sd(o2$L6), L7 = sd(o2$L7), L8 = sd(o2$L8), L9 = sd(o2$L9), L10 = sd(o2$L10),
-                            L11=sd(o2$L11), L12 = sd(o2$L12), L13 = sd(o2$L13), L14 = sd(o2$L14), L15 = sd(o2$L15),
-                            L16 = sd(o2$L16), L17 = sd(o2$L17), L18 = sd(o2$L18), L19 = sd(o2$L19), L20 = sd(o2$L20),
-                            A=0.5*sd(o2$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o2$L1), L2 = 2*sd(o2$L2), L3 = 2*sd(o2$L3), L4 = 2*sd(o2$L4), L5 = 2*sd(o2$L5),
+                            L6 = 2*sd(o2$L6), L7 = 2*sd(o2$L7), L8 = 2*sd(o2$L8), L9 = 2*sd(o2$L9), L10 = 2*sd(o2$L10),
+                            L11=2*sd(o2$L11), L12 = 2*sd(o2$L12), L13 = 2*sd(o2$L13), L14 = 2*sd(o2$L14), L15 = 2*sd(o2$L15),
+                            L16 = 2*sd(o2$L16), L17 = 2*sd(o2$L17), L18 = 2*sd(o2$L18), L19 = 2*sd(o2$L19), L20 = 2*sd(o2$L20),
+                            A=0.5*2*sd(o2$A)),  # use 1 2*sd for L_i, 0.5 2*sd for A
+             plot.out = F)
 #ggsave("bp20_hm_uncat_corr.png", width = 2.5, height = 6)
-#saveRDS(res2, "hm_20_uncat_corr.RDS")
+saveRDS(res2, "hm_20_uncat_corr_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res2[res2$shift == 2 & res2$diagnostic < quantile(res2[res2$shift == 2, "diagnostic"], 0.05), "observation"])
 o2[outliers_ind0,] %>% nrow()
@@ -462,14 +462,14 @@ o2[outliers_ind0,] %>% filter(L19==1 & L20==1) %>% nrow()  # same as for uncorr,
 
 # hm
 res2 <- kbsd(data = o2, int_data_list = list(o2_1, o2_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o2$L1), L2 = sd(o2$L2), L3 = sd(o2$L3), L4 = sd(o2$L4), L5 = sd(o2$L5),
-                            L6 = sd(o2$L6), L7 = sd(o2$L7), L8 = sd(o2$L8), L9 = sd(o2$L9), L10 = sd(o2$L10),
-                            L11=sd(o2$L11), L12 = sd(o2$L12), L13 = sd(o2$L13), L14 = sd(o2$L14), L15 = sd(o2$L15),
-                            L16 = sd(o2$L16), L17 = sd(o2$L17), L18 = sd(o2$L18), L19 = sd(o2$L19), L20 = sd(o2$L20),
-                            A=0.5*sd(o2$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o2$L1), L2 = 2*sd(o2$L2), L3 = 2*sd(o2$L3), L4 = 2*sd(o2$L4), L5 = 2*sd(o2$L5),
+                            L6 = 2*sd(o2$L6), L7 = 2*sd(o2$L7), L8 = 2*sd(o2$L8), L9 = 2*sd(o2$L9), L10 = 2*sd(o2$L10),
+                            L11=2*sd(o2$L11), L12 = 2*sd(o2$L12), L13 = 2*sd(o2$L13), L14 = 2*sd(o2$L14), L15 = 2*sd(o2$L15),
+                            L16 = 2*sd(o2$L16), L17 = 2*sd(o2$L17), L18 = 2*sd(o2$L18), L19 = 2*sd(o2$L19), L20 = 2*sd(o2$L20),
+                            A=0.5*2*sd(o2$A)),  # use 1 2*sd for L_i, 0.5 2*sd for A
+             plot.out = F)
 #ggsave("bp20_hm_cat_corr.png", width = 2.5, height = 6)
-#saveRDS(res2, "hm_20_cat_corr.RDS")
+saveRDS(res2, "hm_20_cat_corr_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res2[res2$shift == 2 & res2$diagnostic < quantile(res2[res2$shift == 2, "diagnostic"], 0.05), "observation"])
 o2[outliers_ind0,] %>% nrow()
@@ -625,14 +625,14 @@ o3[outliers_ind1,] %>% filter(L5 > 4 & L5 <6) %>% nrow()  # as for uncorr: major
 
 # hm 
 res3 <- kbsd(data = o3, int_data_list = list(o3_1, o3_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o3$L1), L2 = sd(o3$L2), L3 = sd(o3$L3), L4 = sd(o3$L4), L5 = sd(o3$L5),
-                            L6 = sd(o3$L6), L7 = sd(o3$L7), L8 = sd(o3$L8), L9 = sd(o3$L9), L10 = sd(o3$L10),
-                            L11=sd(o3$L11), L12 = sd(o3$L12), L13 = sd(o3$L13), L14 = sd(o3$L14), L15 = sd(o3$L15),
-                            L16 = sd(o3$L16), L17 = sd(o3$L17), L18 = sd(o3$L18), L19 = sd(o3$L19), L20 = sd(o3$L20),
-                            A=0.5*sd(o3$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o3$L1), L2 = 2*sd(o3$L2), L3 = 2*sd(o3$L3), L4 = 2*sd(o3$L4), L5 = 2*sd(o3$L5),
+                            L6 = 2*sd(o3$L6), L7 = 2*sd(o3$L7), L8 = 2*sd(o3$L8), L9 = 2*sd(o3$L9), L10 = 2*sd(o3$L10),
+                            L11=2*sd(o3$L11), L12 = 2*sd(o3$L12), L13 = 2*sd(o3$L13), L14 = 2*sd(o3$L14), L15 = 2*sd(o3$L15),
+                            L16 = 2*sd(o3$L16), L17 = 2*sd(o3$L17), L18 = 2*sd(o3$L18), L19 = 2*sd(o3$L19), L20 = 2*sd(o3$L20),
+                            A=0.5*2*sd(o3$A)),  # use 1 2*sd for L_i, 0.5 2*sd for A
+             plot.out = F)
 #ggsave("bp20_hm_uncat_int.png", width=2.5, height=6)
-#saveRDS(res3, "hm_20_uncat_int.RDS")
+#saveRDS(res3, "hm_20_uncat_int_bc.RDS")
 # checking if viol stratum included in the outliers
 outliers_ind0 <- unique(res3[res3$shift == 1 & res3$diagnostic < quantile(res3[res3$shift == 1, "diagnostic"], 0.05), "observation"])
 o3[outliers_ind0,] %>% nrow()
@@ -694,14 +694,14 @@ o3[outliers_ind1,] %>% filter(L5 > 4 & L5 <6) %>% nrow()  # as for uncorr: major
 
 # hm 
 res3 <- kbsd(data = o3, int_data_list = list(o3_1, o3_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o3$L1), L2 = sd(o3$L2), L3 = sd(o3$L3), L4 = sd(o3$L4), L5 = sd(o3$L5),
-                            L6 = sd(o3$L6), L7 = sd(o3$L7), L8 = sd(o3$L8), L9 = sd(o3$L9), L10 = sd(o3$L10),
-                            L11=sd(o3$L11), L12 = sd(o3$L12), L13 = sd(o3$L13), L14 = sd(o3$L14), L15 = sd(o3$L15),
-                            L16 = sd(o3$L16), L17 = sd(o3$L17), L18 = sd(o3$L18), L19 = sd(o3$L19), L20 = sd(o3$L20),
-                            A=0.5*sd(o3$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o3$L1), L2 = 2*sd(o3$L2), L3 = 2*sd(o3$L3), L4 = 2*sd(o3$L4), L5 = 2*sd(o3$L5),
+                            L6 = 2*sd(o3$L6), L7 = 2*sd(o3$L7), L8 = 2*sd(o3$L8), L9 = 2*sd(o3$L9), L10 = 2*sd(o3$L10),
+                            L11=2*sd(o3$L11), L12 = 2*sd(o3$L12), L13 = 2*sd(o3$L13), L14 = 2*sd(o3$L14), L15 = 2*sd(o3$L15),
+                            L16 = 2*sd(o3$L16), L17 = 2*sd(o3$L17), L18 = 2*sd(o3$L18), L19 = 2*sd(o3$L19), L20 = 2*sd(o3$L20),
+                            A=0.5*2*sd(o3$A)),  # use 1 2*sd for L_i, 0.5 2*sd for A
+             plot.out = F)
 #ggsave("bp_20_hm_cat_int.png", width = 2.5, height = 6)
-#saveRDS(res3, "")
+#saveRDS(res3, "hm_20_cat_int_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res3[res3$shift == 1 & res3$diagnostic < quantile(res3[res3$shift == 1, "diagnostic"], 0.05), "observation"])
 o3[outliers_ind0,] %>% nrow()
@@ -853,14 +853,14 @@ o4[outliers_ind1,] %>% filter(L5 <=4) %>% nrow()  # as for uncorr: majority of o
 
 # hm 
 res4 <- kbsd(data = o4, int_data_list = list(o4_1, o4_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o4$L1), L2 = sd(o4$L2), L3 = sd(o4$L3), L4 = sd(o4$L4), L5 = sd(o4$L5),
-                            L6 = sd(o4$L6), L7 = sd(o4$L7), L8 = sd(o4$L8), L9 = sd(o4$L9), L10 = sd(o4$L10),
-                            L11=sd(o4$L11), L12 = sd(o4$L12), L13 = sd(o4$L13), L14 = sd(o4$L14), L15 = sd(o4$L15),
-                            L16 = sd(o4$L16), L17 = sd(o4$L17), L18 = sd(o4$L18), L19 = sd(o4$L19), L20 = sd(o4$L20),
-                            A=0.5*sd(o4$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o4$L1), L2 = 2*sd(o4$L2), L3 = 2*sd(o4$L3), L4 = 2*sd(o4$L4), L5 = 2*sd(o4$L5),
+                            L6 = 2*sd(o4$L6), L7 = 2*sd(o4$L7), L8 = 2*sd(o4$L8), L9 = 2*sd(o4$L9), L10 = 2*sd(o4$L10),
+                            L11=2*sd(o4$L11), L12 = 2*sd(o4$L12), L13 = 2*sd(o4$L13), L14 = 2*sd(o4$L14), L15 = 2*sd(o4$L15),
+                            L16 = 2*sd(o4$L16), L17 = 2*sd(o4$L17), L18 = 2*sd(o4$L18), L19 = 2*sd(o4$L19), L20 = 2*sd(o4$L20),
+                            A=0.5*2*sd(o4$A)),
+             plot.out = F)
 #ggsave("bp20_hm_uncat_ext.png", width=2.5, height=6)
-#saveRDS(res4, "hm_20_uncat_ext.RDS")
+#saveRDS(res4, "hm_20_uncat_ext_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res4[res4$shift == 1 & res4$diagnostic < quantile(res4[res4$shift == 1, "diagnostic"], 0.05), "observation"])
 o4[outliers_ind0,] %>% nrow()
@@ -920,14 +920,14 @@ o4[outliers_ind1,] %>% filter(L5 <8) %>% nrow()  # as for uncorr: majority of ou
 
 # hm 
 res4 <- kbsd(data = o4, int_data_list = list(o4_1, o4_2), type = "harmonicmean",
-             disthalf_vec=c(L1=sd(o4$L1), L2 = sd(o4$L2), L3 = sd(o4$L3), L4 = sd(o4$L4), L5 = sd(o4$L5),
-                            L6 = sd(o4$L6), L7 = sd(o4$L7), L8 = sd(o4$L8), L9 = sd(o4$L9), L10 = sd(o4$L10),
-                            L11=sd(o4$L11), L12 = sd(o4$L12), L13 = sd(o4$L13), L14 = sd(o4$L14), L15 = sd(o4$L15),
-                            L16 = sd(o4$L16), L17 = sd(o4$L17), L18 = sd(o4$L18), L19 = sd(o4$L19), L20 = sd(o4$L20),
-                            A=0.5*sd(o4$A)),  # use 1 SD for L_i, 0.5 SD for A
-             plot.out = T)
+             disthalf_vec=c(L1=2*sd(o4$L1), L2 = 2*sd(o4$L2), L3 = 2*sd(o4$L3), L4 = 2*sd(o4$L4), L5 = 2*sd(o4$L5),
+                            L6 = 2*sd(o4$L6), L7 = 2*sd(o4$L7), L8 = 2*sd(o4$L8), L9 = 2*sd(o4$L9), L10 = 2*sd(o4$L10),
+                            L11=2*sd(o4$L11), L12 = 2*sd(o4$L12), L13 = 2*sd(o4$L13), L14 = 2*sd(o4$L14), L15 = 2*sd(o4$L15),
+                            L16 = 2*sd(o4$L16), L17 = 2*sd(o4$L17), L18 = 2*sd(o4$L18), L19 = 2*sd(o4$L19), L20 = 2*sd(o4$L20),
+                            A=0.5*2*sd(o4$A)), 
+             plot.out = F)
 #ggsave("bp20_hm_cat_ext.png", width = 2.5, height = 6)
-#saveRDS(res4, "")
+#saveRDS(res4, "hm_20_cat_ext_bc.RDS")
 # checking if viol stratum L19=1 & L20=1 included in the outliers
 outliers_ind0 <- unique(res4[res4$shift == 1 & res4$diagnostic < quantile(res4[res4$shift == 1, "diagnostic"], 0.05), "observation"])
 o4[outliers_ind0,] %>% nrow()
