@@ -104,7 +104,8 @@ make_strata_table(art, A = "SAMEDAY", binary_vars = binary_vars) %>% arrange(pro
 
 
 
-## PoRT: continuous vars uncategorised ----
+## 2.1) PoRT ----
+### continuous vars uncategorised ----
 source("data/port_utils.R")
 res <- list()
 a_values <- c(0.01, 0.025, 0.05, 0.1)
@@ -168,7 +169,7 @@ res
 #       pregnant, PHC (IF PHC = 16-, but then again not all PHC?), but not TimeHIVToEnrol =3
 # interesting that all viol are with v high P(A=1), i.e. v high P(same-day), except for the one with P(A=1)=0!
 
-## PoRT: continuous vars categorised (acc to paper, can assume that domain experts decided on sensible thresholds there) ----
+### continuous vars categorised (acc to paper, can assume that domain experts decided on sensible thresholds there) ----
 art_cat <- art
 art_cat$cd4 <- cut(art$cd4, breaks = c(-Inf, 100, 200, 350, 500, Inf))
 art_cat$bmi <- cut(art$bmi, breaks = c(0, 18.5, 25, Inf), right = F)
@@ -224,7 +225,9 @@ res_cat
 
 
 
-## KBSD Rfast ----
+## 2.2) KBSD Rfast ----
+
+### uncategorised cont confounders ----
 source("kbsd.R")
 
 # kbsd cannot deal with factors (only cont + binary, bc binary seen as cont),
@@ -278,7 +281,7 @@ table(art$phone, art_num$phone)
 summary(art_num)
 
 
-## check for correlation ----
+### check for correlation ----
 abs(cor(art_num)) > 0.3  # who & tb/cd4, sex & age/bmi/hb/creat, underTreatAll & TimeHIVToEnrol
 cor(art_num$who, art_num$tb)
 cor(art_num$who, art_num$cd4)  # the more advanced the stage, the fewer cd4 cells makes sense
@@ -300,6 +303,9 @@ cor(art_num$facility, art_num$SAMEDAY)  # also almost cor=0.3
 # all 16 confounders ---
 # o1, o2 with intervened-on obs must only have the variables used lateron in disthalf_vec!!!
 # imp to select all vars even if actually all cols, bc art_num df has weird indices
+new <- outliers_ind2|outliers_ind1
+art_num <- art_num[!new, ]
+
 o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
 o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
@@ -329,7 +335,7 @@ table(art$SAMEDAY)  # which makes sense bc almost twice as many same-day as earl
 # check who/what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 # (within each var, we know what cat has few support then, but diff to agg to critical stratum then/to know which intersections have lowest support)
 shift1 <- res[res$shift==1,]
-outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.05)#0.05
+outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.1)#0.05
 outliers_val1 <- shift1[outliers_ind1, "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
@@ -357,7 +363,7 @@ art_num[outliers_ind1,] %>% filter(facility == 11 & sex == 0)
 
 # what obs/strata have few support in IV=2 (A=0) ---
 shift2 <- res[res$shift==2,]
-outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.05)  # indices of obs with few support
+outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.1)  # indices of obs with few support
 outliers_val2 <- shift2[outliers_ind2, "diagnostic"]  # diag values of obs with few support
 # check overall what the obs are that have few EDP:
 for (i in names(art_num)[-17]) {
@@ -394,7 +400,9 @@ art_num[outliers_ind2,] %>% filter(facility != 11 & underTreatAll==1)
 #          under treat all policy, first clinical stage, without tb, with phone
 
 
-## KBSD with categorised cont confounders ----
+
+
+### categorised cont confounders ----
 
 art_num$cd4 <- cut(art_num$cd4, breaks = c(-Inf, 100, 200, 350, 500, Inf))
 art_num$bmi <- cut(art_num$bmi, breaks = c(0, 18.5, 25, Inf), right = F)
@@ -423,26 +431,48 @@ o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
 o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
-res_hm_cat <- kbsd(data = art_num, int_data_list = list(o1, o2),
+res_cat <- kbsd(data = art_num, int_data_list = list(o1, o2),
                    disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                                     age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
                                     tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
                                     marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                                     education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                                     hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)), plot.out = F)
-#saveRDS(res_hm_cat, "output_kbsd_cat.RDS")
-res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2),
+res_cat_plot <- kbsd(data = art_num, int_data_list = list(o1, o2),
                     disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                                      age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
                                      tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
                                      marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                                      education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                                      hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("art_bp_cat.png", width = 5, height = 6)
+
+# what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
+shift1 <- res_cat[res_cat$shift==1,]
+outliers_ind1 <- shift1$diagnostic < quantile(shift1$diagnostic, 0.05)  # indices of obs with few support
+outliers_val1 <- shift1[shift1$diagnostic < quantile(shift1$diagnostic, 0.05), "diagnostic"]  # diag values of obs with few support
+# check overall what the obs are that have few EDP:
+for (i in names(art_num)[-17]) {
+  print(paste0(i, ": ", mfv(art_num[outliers_ind1, i])))
+}
+# diff values for some vars now: TimeHIVToEnrol=1, cd4=74, bmi=23 instead of 22.7, hb=10.7, alt=3&25, creat=54
+# few support for diag & enrolment on same day makes sense -> would rather not start ART immediately (those with diag longer time ago would rather start fast after enrolment)
+
+
+# double-check what strata have few support among IV=2 (A=0) ---
+shift2 <- res_cat[res_cat$shift==2,]
+outliers_ind2 <- shift2$diagnostic < quantile(shift2$diagnostic, 0.05)  # indices of obs with few support
+outliers_val2 <- shift2[shift2$diagnostic < quantile(shift2$diagnostic, 0.05), "diagnostic"]  # diag values of obs with few support
+# check overall what the obs are that have few EDP:
+for (i in names(art_num)[-17]) {
+  print(paste0(i, ": ", mfv(art_num[outliers_ind2, i])))
+}
 
 
 
-## KBSD harmonic mean ----
+
+## 2.3) KBSD harmonic mean ----
+
+### uncategorised cont confounders ----
 
 o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
@@ -463,7 +493,7 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("art_bp_hm_no_fac16.png", width = 5, height = 6)
+#ggsave("output_kbsd_hm_no_outliers_q1.png", width = 5, height = 6)
 
 # double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 shift1 <- res_hm[res_hm$shift==1,]
@@ -495,7 +525,7 @@ r <- (res_plot + ylab("Effective Data Points (EDP)") + ylim(0,10) )|
 
 
 
-## KBSD hm with categorised continuous confounders (cd4, bmi, hb, alt, creat) ----
+### categorised continuous confounders (cd4, bmi, hb, alt, creat) ----
 
 o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
