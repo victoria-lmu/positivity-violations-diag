@@ -1,7 +1,6 @@
 source("setup.R")
 
 # 1) Data Cleaning ----
-setwd("C:/Users/victo/OneDrive/Desktop/Uni/Statistik/BA_thesis/positivity-violations-diag")
 sdd <- read.csv("data/sameday_wide_MI.csv") # read in .csv file with imputed data
 sameday <- subset(sdd, select=c("sexpregnancy","age_cat2","education_cat1","mstatus_cat1",
                                 "year","facility_cat2_rename","HIVdiagEnrol1","preEAAA1",
@@ -303,14 +302,17 @@ cor(art_num$facility, art_num$SAMEDAY)  # also almost cor=0.3
 # all 16 confounders ---
 # o1, o2 with intervened-on obs must only have the variables used lateron in disthalf_vec!!!
 # imp to select all vars even if actually all cols, bc art_num df has weird indices
-new <- outliers_ind2|outliers_ind1
-art_num <- art_num[!new, ]
 
+#new <- outliers_ind2|outliers_ind1
+#art_num <- art_num[!new, ]
+source("k4.R")
 o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
 o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
-res <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
+res <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "minval",
+            minval_vec = c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                           0.5, 0.5, 0.5, 0.5, 0.1),
                  disthalf_vec = c(sex =sd(art_num$sex), facility =sd(art_num$facility), TimeHIVToEnrol=sd(art_num$TimeHIVToEnrol),
                                   age =sd(art_num$age), year =sd(art_num$year), cd4 = sd(art_num$cd4), bmi= sd(art_num$bmi), 
                                   tb =sd(art_num$tb), phone=sd(art_num$phone), who = sd(art_num$who),
@@ -324,7 +326,7 @@ res_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "Rfast",
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("art_bp.png", width = 5, height = 6)
+ggsave("art_bp3_2.png", width = 5, height = 6)
 # order in disthalf_vec has to be equal to col order in o1/o2?
 
 # overall v few EDP bc 16 confounders <=> 16 dimensions
@@ -493,7 +495,7 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                       marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                       education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                       hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("output_kbsd_hm_no_outliers_q1.png", width = 5, height = 6)
+ggsave("art_bp_hm3.png", width = 5, height = 6)
 
 # double-check what strata have few support among IV=1 (A=1) -> "problem": can just check univariately ---
 shift1 <- res_hm[res_hm$shift==1,]
@@ -526,7 +528,6 @@ r <- (res_plot + ylab("Effective Data Points (EDP)") + ylim(0,10) )|
 
 
 ### categorised continuous confounders (cd4, bmi, hb, alt, creat) ----
-
 o1 <- art_num %>% mutate(SAMEDAY=1) %>%
   select(sex, facility, TimeHIVToEnrol, age, year, cd4, bmi, tb, phone, who, marital, alt, creat, education, underTreatAll, hb, SAMEDAY)
 o2 <- art_num %>% mutate(SAMEDAY=0) %>% 
@@ -546,4 +547,4 @@ res_hm_plot <- kbsd(data = art_num, int_data_list = list(o1, o2), type = "harmon
                                      marital = sd(art_num$marital), alt =sd(art_num$alt), creat = sd(art_num$creat), 
                                      education = sd(art_num$education), underTreatAll = sd(art_num$underTreatAll),
                                      hb=sd(art_num$hb), SAMEDAY =0.5*sd(art_num$SAMEDAY)))
-#ggsave("art_bp_hm_cat.png", width = 5, height = 6)
+ggsave("art_bp_hm3_cat.png", width = 5, height = 6)

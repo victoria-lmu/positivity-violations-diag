@@ -339,7 +339,7 @@ o3 %>% filter(L1==1 & L2==1 & L3 ==3 & A==1) %>% nrow()/o3 %>% filter(L1==1 & L2
 
 
 
-# 3 Confounders With Middle-Gap ----
+# 3 Confounders With Internal Violation ----
 
 # concatenate L1 + L2, so that low density in centre (bimodal distr) 
 # → adjust A accordingly (sides with higher P(A), centre with lower P(A))
@@ -450,10 +450,12 @@ table(data1$A)  # see that alr fewer support among IV=1 bc fewer obs in A=1
 # plot with subplot "values of var with viol" & subplot "EDP boxplots"
 internal_3 <- ggplot(data1, aes(x=factor(A), y=L3)) + 
   geom_point(size=3, alpha=0.1) +
-  theme(axis.title.x = element_blank()) + 
+  theme(axis.title.x = element_blank(),
+        axis.text=element_text(size=14, colour = "black"),
+        axis.title=element_text(size=19)) + 
   scale_x_discrete(labels = c("A = 0", "A = 1"))
 internal_3 / res5_plot
-#ggsave("internal_3_edp.png", width = 4, height = 9)
+ggsave("internal_3_edp3.png", width = 4, height = 9)
 
 # expect subgroup L3=(4,6] to have few support for IV=1 (A=1) if would estimate Y|A=1 further:
 shift1 <- res5[res5$shift == 1,]
@@ -535,7 +537,7 @@ o3[indices_outliers, ] %>% filter(!(L3 > 4 & L3 < 6))
 
 
 
-# 3 Confounders With Left-Side-Gap ----
+# 5 Confounders With External Violation ----
 
 set.seed(27092025)
 L3_1 <- rnorm(100, 3, 1)
@@ -738,12 +740,10 @@ o3_1 <- o3
 o3_1$A <- 1
 o3_2 <- o3
 o3_2$A <- 0
-res3 <- kbsd(data = o3,
-             int_data_list = list(o3_1, o3_2),
-             disthalf_vec=c(L1=0.5*sd(o3$L1), L2 = 0.5*sd(o3$L2), L3 = 0.5*sd(o3$L3), A=0.5*0.5*sd(o3$A)),  # use 1 SD for L_i, 0.5 SD for A
+res3 <- kbsd(data = o3, int_data_list = list(o3_1, o3_2),
+             disthalf_vec=c(L1=sd(o3$L1), L2 = sd(o3$L2), L3 = sd(o3$L3), A=0.5*sd(o3$A)),  # use 1 SD for L_i, 0.5 SD for A
              plot.out = F)
-res3_plot <- kbsd(data = o3,
-                  int_data_list = list(o3_1, o3_2),
+res3_plot <- kbsd(data = o3, int_data_list = list(o3_1, o3_2),
                   disthalf_vec=c(L1=sd(o3$L1), L2 = sd(o3$L2), L3 = sd(o3$L3), A=0.5*sd(o3$A)))  # use 1 SD for L_i, 0.5 SD for A
 res3_plot  # for A=0, majority has low support -> reflects that viol affects A=0
 
